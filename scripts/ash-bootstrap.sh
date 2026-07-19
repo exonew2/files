@@ -4,9 +4,10 @@ set -euo pipefail
 REPO="exonew2/files"
 BRANCH="main"
 ISO_DIR="$HOME/ash-iso"
-GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; NC='\033[0m'
 ok()  { echo -e " ${GREEN}✓${NC} $1"; }
 info(){ echo -e " ${CYAN}→${NC} $1"; }
+warn(){ echo -e " ${YELLOW}⚠${NC} $1"; }
 
 info "Ash Agentic Swarm Habitat — Bootstrap"
 
@@ -34,9 +35,7 @@ ok "Ash ISO files ready at $ISO_DIR"
 
 if [ -f /etc/arch-release ]; then
     info "Running LSFS setup..."
-    bash iso-profile/airootfs/usr/lib/iso/lsfs-setup.sh 2>/dev/null || warn "lsfs-setup skipped"
-    info "Running first-boot setup..."
-    bash iso-profile/airootfs/usr/lib/iso/first-boot.sh 2>/dev/null || warn "first-boot skipped"
+    bash iso-profile/airootfs/usr/lib/iso/lsfs-setup.sh 2>&1 || warn "lsfs-setup encountered issues (see above)"
 fi
 
 echo ""

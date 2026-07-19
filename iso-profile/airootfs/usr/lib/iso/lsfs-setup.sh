@@ -1,8 +1,7 @@
 #!/usr/bin/bash
 # /usr/lib/iso/lsfs-setup.sh — First-boot LSFS setup (v2)
-set -euo pipefail
 
-log() { logger -t iso-lsfs "$*"; }
+log() { echo "[lsfs] $*"; logger -t iso-lsfs "$*" 2>/dev/null || true; }
 
 log "Setting up LSFS (Semantic Filesystem) v2"
 
