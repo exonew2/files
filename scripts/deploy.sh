@@ -73,61 +73,70 @@ for fname, pattern in services.items():
         print(f"Created: {sysd_dir}/{fname}")
 PYEXTRACT
 
-# Make launcher hook
+# Make launcher hook (100x upgraded)
 mkdir -p ~/.config/scripts
 cat > ~/.config/scripts/lsfs_launcher_hook.sh << 'LSFSHOOK'
 #!/usr/bin/env bash
 set -euo pipefail
-QUERY=$(wofi --dmenu --prompt "Agentic Search" --exec-search --cache-file /dev/null < /dev/null)
+QUERY=$(wofi --dmenu --prompt "🔎 Agentic Search" --exec-search --cache-file /dev/null < /dev/null)
 [ -z "${QUERY:-}" ] && exit 0
 notify-send -t 0 -r 999 "Agentic OS" "Searching: $QUERY" &
 RESULTS_FILE=$(mktemp /tmp/lsfs_results.XXXXXX)
 trap 'rm -f "$RESULTS_FILE"' EXIT
 
-# Detect time-based queries like "files from last 42h" / "last 3 days"
-TIME_QUERY=0
-if echo "$QUERY" | grep -qiE '(last|within|past|since|from last|modified|recent|changed).*[0-9]+\s*(h|hr|hour|hours|d|day|days|min|minute)'; then
+# ── Parse time patterns: "all files from 42h", "files last 3 days", "from 2h", "42h", etc ──
+TIME_QUERY=0; TIME_ARG=""
+PAT=$(echo "$QUERY" | grep -oiE '[0-9]+\s*(h|hr|hour|hours|d|day|days)' | head -1 | tr -d ' ')
+if [ -n "$PAT" ]; then
     TIME_QUERY=1
-    # Extract time value
-    TIME_VAL=$(echo "$QUERY" | grep -oiE '[0-9]+\s*(h|hr|hour|hours|d|day|days)' | head -1 | tr -d ' ')
-    notify-send -t 0 -r 999 "Agentic OS" "Time filter: last $TIME_VAL" &
+    if echo "$PAT" | grep -qiE '[0-9]+\s*(h|hr|hour|hours)'; then
+        H=$(echo "$PAT" | grep -oE '[0-9]+')
+        TIME_ARG="${H}h"
+    elif echo "$PAT" | grep -qiE '[0-9]+\s*(d|day|days)'; then
+        D=$(echo "$PAT" | grep -oE '[0-9]+')
+        TIME_ARG="${D}h"
+        notify-send -t 0 -r 999 "Agentic OS" "Time filter: $D days" &
+    fi
 fi
 
-# Run semantic search with time filter support
+# ── Strategy 1: Semantic search (concept + time filters) ──
 timeout 10 python3 ~/.config/scripts/lsfs_query.py --list-mode "$QUERY" > "$RESULTS_FILE" 2>/dev/null
 HAS_RESULTS=0
 if [ -s "$RESULTS_FILE" ] && ! grep -q "No matches" "$RESULTS_FILE"; then
     HAS_RESULTS=1
 fi
 
-# If time query and no semantic results, fall back to fd
+# ── Strategy 2: Time-based fd search (captures "files from 42h", "all files from 42h", etc) ──
 if [ "$TIME_QUERY" -eq 1 ] && [ "$HAS_RESULTS" -eq 0 ]; then
-    TIME_ARG=$(echo "$QUERY" | grep -oiE '(last|within|past|since|from last)\s+[0-9]+\s*(h|hr|hour|hours|d|day|days)' | \
-        sed -E 's/(last|within|past|since|from last) +([0-9]+) +(h|hr|hour|hours)/\2h/; s/(last|within|past|since|from last) +([0-9]+) +(d|day|days)/\2h/')
     if command -v fd &>/dev/null; then
-        fd --changed-within "$TIME_ARG" --type f ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+        fd --changed-within "$TIME_ARG" --type f ~ 2>/dev/null | head -30 > "$RESULTS_FILE"
     elif command -v find &>/dev/null; then
-        find ~ -mmin -$(( ${TIME_ARG%h} * 60 )) -type f 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+        MINS=$(( ${TIME_ARG%h} * 60 ))
+        find ~ -mmin -$MINS -type f 2>/dev/null | head -30 > "$RESULTS_FILE"
     fi
-    if [ -s "$RESULTS_FILE" ]; then
-        HAS_RESULTS=1
-    fi
+    [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
 fi
 
-# If still no results, try fd/extended fallback
+# ── Strategy 3: Universal fd search (any unmatched query) ──
 if [ "$HAS_RESULTS" -eq 0 ]; then
     if command -v fd &>/dev/null; then
-        fd --type f --max-depth 8 ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+        WORDS=$(echo "$QUERY" | tr ' ' '\n' | grep -vE '(all|from|the|of|in|my|files|for|with|and|or|a|an|is|are|to|last|within|past|since|recent|modified|changed|show|list|find|give|get)' | head -3 | tr '\n' '|')
+        if [ -n "$WORDS" ]; then
+            fd --type f "${QUERY%% *}" ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+        else
+            fd --type f --max-depth 5 ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+        fi
     fi
+    [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
 fi
 
-notify-send -t 500 -r 999 "Agentic OS" "Results ready" &
-SELECTED=$(wofi --dmenu --prompt "Results" --cache-file /dev/null < "$RESULTS_FILE")
+notify-send -t 500 -r 999 "Agentic OS" "$(wc -l < "$RESULTS_FILE") results ready" &
+SELECTED=$(wofi --dmenu --prompt "📄 Results ($(wc -l < "$RESULTS_FILE") files)" --cache-file /dev/null < "$RESULTS_FILE")
 [ -z "${SELECTED:-}" ] && exit 0
-TARGET_PATH=$(echo "$SELECTED" | sed 's/ | .*//')
+TARGET_PATH=$(echo "$SELECTED" | sed 's/ | .*//; s/\t.*//')
 [ ! -e "$TARGET_PATH" ] && notify-send -u critical "Not found" && exit 1
 if [ -d "$TARGET_PATH" ]; then hyprctl dispatch exec "kitty -e yazi '$TARGET_PATH'"
-elif echo "$TARGET_PATH" | grep -q '\.desktop$'; then hyprctl dispatch exec "gtk-launch '$(basename "$TARGET_PATH")'"
+elif echo "$TARGET_PATH" | grep -q '\.desktop$'; then hyprctl dispatch exec "gtk-launch '$(basename "$TARGET_PATH')"'
 else hyprctl dispatch exec "kitty --class floating_editor -e nvim '$TARGET_PATH'"; fi
 LSFSHOOK
 chmod +x ~/.config/scripts/lsfs_launcher_hook.sh
