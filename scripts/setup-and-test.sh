@@ -63,22 +63,14 @@ fi
 
 # ── Step 5: Fix VMware clipboard (host-guest copy/paste) ─────────────────────
 info "Step 5: Fixing VMware clipboard..."
-sudo pacman -S --needed --noconfirm open-vm-tools 2>/dev/null || true
-sudo systemctl enable --now vmtoolsd 2>/dev/null || true
-sudo systemctl enable --now vmware-vmblock-fuse 2>/dev/null || true
-# Enable guest isolation in VMX (run on host, not guest)
-if [ -f /etc/vmware-tools/tools.conf ]; then
-    sudo sed -i 's/^#enableDragAndDrop = false/enableDragAndDrop = true/' /etc/vmware-tools/tools.conf 2>/dev/null || true
-    sudo sed -i 's/^#enableCopyPaste = false/enableCopyPaste = true/' /etc/vmware-tools/tools.conf 2>/dev/null || true
-fi
-if grep -qi vmware /sys/class/dmi/id/sys_vendor 2>/dev/null; then
-    ok "VMware tools installed (reboot for clipboard)"
+if bash "$ISO_DIR/scripts/fix-clipboard.sh"; then
+    ok "VMware clipboard fix applied"
 else
-    warn "Not in VMware — skipping clipboard fix"
+    warn "Clipboard fix encountered issues — run manually: bash $ISO_DIR/scripts/fix-clipboard.sh"
 fi
 
 # ── Step 6: Patch Hyprland for Super+Space ───────────────────────────────────
-info "Step 5: Patching Hyprland for Super+Space..."
+info "Step 6: Patching Hyprland for Super+Space..."
 HYPR_CONF="$HOME/.config/hypr/hyprland.conf"
 if [ -f "$HYPR_CONF" ]; then
     if ! grep -q "lsfs_launcher_hook" "$HYPR_CONF" 2>/dev/null; then
@@ -99,7 +91,7 @@ else
 fi
 
 # ── Step 7: Index some files for testing ─────────────────────────────────────
-info "Step 6: Indexing test files..."
+info "Step 7: Indexing test files..."
 lsfs-query --index "$HOME/.config" 2>/dev/null && ok "Indexed ~/.config" || warn "Index skipped"
 lsfs-query --index "$HOME/ash-iso/docs" 2>/dev/null && ok "Indexed docs/" || true
 

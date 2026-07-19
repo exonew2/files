@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LSFS Daemon
+Exec=systemctl --user start lsfs-daemon.service
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

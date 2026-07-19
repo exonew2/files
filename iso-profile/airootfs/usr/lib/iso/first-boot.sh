@@ -88,6 +88,7 @@ systemctl enable --now iso-disable-watchdog.service
 loginctl enable-linger aiuser 2>/dev/null || true
 AIUSER_UID=$(id -u aiuser 2>/dev/null || echo 1000)
 su - aiuser -c "XDG_RUNTIME_DIR=/run/user/$AIUSER_UID systemctl --user enable ash-agent.service ash-workspace.service ash-launcher.service" 2>/dev/null || true
+su - aiuser -c "XDG_RUNTIME_DIR=/run/user/$AIUSER_UID systemctl --user enable --now lsfs-daemon.service lsfs-parity.timer" 2>/dev/null || true
 
 # 22b. Add Ash Shell integration to aiuser shell configs
 for RC in /home/aiuser/.bashrc /home/aiuser/.zshrc; do
@@ -110,6 +111,10 @@ fi
 
 # 26. Setup LSFS Semantic Filesystem
 /usr/lib/iso/lsfs-setup.sh
+
+# 26b. Auto-index common dirs for instant search
+su - aiuser -c "XDG_RUNTIME_DIR=/run/user/$AIUSER_UID /home/aiuser/.local/bin/lsfs-query --index /home/aiuser/.config" 2>/dev/null || true
+su - aiuser -c "XDG_RUNTIME_DIR=/run/user/$AIUSER_UID /home/aiuser/.local/bin/lsfs-query --index /home/aiuser/ash-iso/docs" 2>/dev/null || true
 
 # 27. Mark done
 touch /etc/iso-firstboot-done
