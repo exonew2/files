@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, stat, time, json, errno, logging, signal, threading
+import os, sys, stat, time, json, errno, logging, signal, threading, re
 import subprocess, urllib.request, urllib.error, http.client, socket
 from datetime import datetime
 
@@ -95,7 +95,26 @@ def _embed(text, retries=1):
                 time.sleep(1)
     return None
 
+_RELATIVE_TIME_RE = re.compile(r'\b(last|within|past|since)\s+(\d+)\s*(h|hr|hour|hours|d|day|days|m|min|minute|minutes|s|sec|second|seconds)\b', re.IGNORECASE)
+
+def _parse_relative_time(query):
+    now = time.time()
+    def _replace(m):
+        amount = int(m.group(2))
+        unit = m.group(3).lower()[0]
+        if unit in ('h',):
+            ts = now - amount * 3600
+        elif unit in ('d',):
+            ts = now - amount * 86400
+        elif unit in ('m',):
+            ts = now - amount * 60
+        else:
+            ts = now - amount
+        return f" after:{time.strftime('%Y-%m-%d', time.gmtime(ts))}"
+    return _RELATIVE_TIME_RE.sub(_replace, query)
+
 def _parse_filters(query):
+    query = _parse_relative_time(query)
     filters = {"must": []}
     tokens = query.split()
     clean = []
@@ -104,7 +123,7 @@ def _parse_filters(query):
             k, v = t.split(':', 1)
             k = k.lower()
             if k == 'ext':
-                filters["must"].append({"key": "ext", "match": {"value": v}})
+                filters["must"].append({"key": "ext", "match": {"value": v if v.startswith('.') else '.' + v}})
                 continue
             elif k == 'type':
                 filters["must"].append({"key": "type", "match": {"value": v}})

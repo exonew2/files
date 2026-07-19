@@ -83,7 +83,44 @@ QUERY=$(wofi --dmenu --prompt "Agentic Search" --exec-search --cache-file /dev/n
 notify-send -t 0 -r 999 "Agentic OS" "Searching: $QUERY" &
 RESULTS_FILE=$(mktemp /tmp/lsfs_results.XXXXXX)
 trap 'rm -f "$RESULTS_FILE"' EXIT
+
+# Detect time-based queries like "files from last 42h" / "last 3 days"
+TIME_QUERY=0
+if echo "$QUERY" | grep -qiE '(last|within|past|since|from last|modified|recent|changed).*[0-9]+\s*(h|hr|hour|hours|d|day|days|min|minute)'; then
+    TIME_QUERY=1
+    # Extract time value
+    TIME_VAL=$(echo "$QUERY" | grep -oiE '[0-9]+\s*(h|hr|hour|hours|d|day|days)' | head -1 | tr -d ' ')
+    notify-send -t 0 -r 999 "Agentic OS" "Time filter: last $TIME_VAL" &
+fi
+
+# Run semantic search with time filter support
 timeout 10 python3 ~/.config/scripts/lsfs_query.py --list-mode "$QUERY" > "$RESULTS_FILE" 2>/dev/null
+HAS_RESULTS=0
+if [ -s "$RESULTS_FILE" ] && ! grep -q "No matches" "$RESULTS_FILE"; then
+    HAS_RESULTS=1
+fi
+
+# If time query and no semantic results, fall back to fd
+if [ "$TIME_QUERY" -eq 1 ] && [ "$HAS_RESULTS" -eq 0 ]; then
+    TIME_ARG=$(echo "$QUERY" | grep -oiE '(last|within|past|since|from last)\s+[0-9]+\s*(h|hr|hour|hours|d|day|days)' | \
+        sed -E 's/(last|within|past|since|from last) +([0-9]+) +(h|hr|hour|hours)/\2h/; s/(last|within|past|since|from last) +([0-9]+) +(d|day|days)/\2h/')
+    if command -v fd &>/dev/null; then
+        fd --changed-within "$TIME_ARG" --type f ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+    elif command -v find &>/dev/null; then
+        find ~ -mmin -$(( ${TIME_ARG%h} * 60 )) -type f 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+    fi
+    if [ -s "$RESULTS_FILE" ]; then
+        HAS_RESULTS=1
+    fi
+fi
+
+# If still no results, try fd/extended fallback
+if [ "$HAS_RESULTS" -eq 0 ]; then
+    if command -v fd &>/dev/null; then
+        fd --type f --max-depth 8 ~ 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+    fi
+fi
+
 notify-send -t 500 -r 999 "Agentic OS" "Results ready" &
 SELECTED=$(wofi --dmenu --prompt "Results" --cache-file /dev/null < "$RESULTS_FILE")
 [ -z "${SELECTED:-}" ] && exit 0
