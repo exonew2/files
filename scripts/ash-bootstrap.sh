@@ -36,6 +36,9 @@ ok "Ash ISO files ready at $ISO_DIR"
 if [ -f /etc/arch-release ]; then
     info "Running LSFS setup..."
     bash iso-profile/airootfs/usr/lib/iso/lsfs-setup.sh 2>&1 || warn "lsfs-setup encountered issues (see above)"
+    info "Fixing VMware clipboard..."
+    sudo pacman -S --needed --noconfirm open-vm-tools 2>/dev/null || true
+    sudo systemctl enable --now vmtoolsd vmware-vmblock-fuse 2>/dev/null || true
 fi
 
 echo ""
