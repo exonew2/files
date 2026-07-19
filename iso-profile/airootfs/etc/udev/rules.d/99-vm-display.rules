@@ -1,0 +1,11 @@
+# /etc/udev/rules.d/99-vm-display.rules
+# VMware
+SUBSYSTEM=="drm", DRIVER=="vmwgfx", ACTION=="change", RUN+="/usr/lib/iso/display-hotplug.sh vmware"
+# VirtualBox
+SUBSYSTEM=="drm", DRIVER=="vboxvideo", ACTION=="change", RUN+="/usr/lib/iso/display-hotplug.sh vbox"
+# QEMU/QXL
+SUBSYSTEM=="drm", DRIVER=="qxl", ACTION=="change", RUN+="/usr/lib/iso/display-hotplug.sh qxl"
+# VirtIO-GPU / VirtIO-GPU-PCI / VirtIO-GPU-VIRGL
+SUBSYSTEM=="drm", DRIVER=="virtio_gpu", ACTION=="change", RUN+="/usr/lib/iso/display-hotplug.sh virgl"
+# SPICE
+SUBSYSTEM=="virtio-ports", ATTR{name}=="com.redhat.spice.0", ACTION=="add", RUN+="/usr/lib/iso/spice-agent-ready.sh"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Qdrant Vector Search Engine
+Documentation=https://qdrant.tech/documentation/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=qdrant
+Group=qdrant
+ExecStart=/usr/bin/qdrant --config-path /etc/qdrant/config.yaml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+MemoryLimit=4G
+CPUQuota=200%
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/qdrant /run/qdrant
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

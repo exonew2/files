@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Btrfs maintenance
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=6h
+
+[Install]
+WantedBy=timers.target

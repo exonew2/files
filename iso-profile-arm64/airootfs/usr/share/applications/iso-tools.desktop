@@ -1,0 +1,29 @@
+# /usr/share/applications/iso-debug-issue.desktop
+[Desktop Entry]
+Name=Collect Debug Logs
+Comment=Create debug archive for issue reporting
+Exec=iso-debug-issue
+Icon=system-log-viewer
+Terminal=true
+Type=Application
+Categories=System;Development;
+
+# /usr/share/applications/iso-report-issue.desktop
+[Desktop Entry]
+Name=Report Issue
+Comment=Collect logs and open GitHub issue
+Exec=iso-report-issue
+Icon=dialog-warning
+Terminal=false
+Type=Application
+Categories=System;Development;
+
+# /usr/share/applications/iso-uninstall.desktop
+[Desktop Entry]
+Name=Uninstall ISO AI VM
+Comment=Remove this VM from host system
+Exec=pkexec /home/aiuser/Desktop/iso-uninstall.sh
+Icon=application-exit
+Terminal=true
+Type=Application
+Categories=System;

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ash-check-health — Health check for Ash Desktop components
+set -euo pipefail
+
+EXIT_CODE=0
+
+check() {
+    local name="$1"
+    local status="$2"
+    if [ "$status" = "OK" ]; then
+        printf "  \033[32m✓\033[0m %s\n" "$name"
+    else
+        printf "  \033[31m✗\033[0m %s: %s\n" "$name" "$status"
+        EXIT_CODE=1
+    fi
+}
+
+echo "=== Ash Desktop Health Check ==="
+echo
+
+echo "Compositor:"
+check "Hyprland" "$(hyprctl monitors 2>/dev/null | grep -q Monitor && echo OK || echo 'Not running')"
+
+echo "AI Services:"
+check "Ollama" "$(ollama list 2>/dev/null | tail -n +2 | head -1 | awk '{print $1 " (" $3 ")"}' || echo 'Not running')"
+check "Qdrant" "$(curl -sf http://localhost:6333/health 2>/dev/null | jq -r '.status // "down"' 2>/dev/null || echo 'Not running')"
+check "LSFS" "$(mountpoint -q /mnt/lsfs 2>/dev/null && echo OK || echo 'Not mounted')"
+
+echo "Desktop:"
+check "Waybar" "$(pgrep -x waybar > /dev/null && echo OK || echo 'Not running')"
+check "SwayNC" "$(pgrep -x swaync > /dev/null && echo OK || echo 'Not running')"
+check "Agent" "$(pgrep -x ash-agent > /dev/null && echo OK || echo 'Not running')"
+
+echo "System:"
+check "Audio" "$(wpctl status 2>/dev/null | grep -q Sinks && echo OK || echo 'No sinks')"
+check "Network" "$(nmcli -t -f STATE g 2>/dev/null | grep -q connected && echo OK || echo 'Disconnected')"
+
+exit $EXIT_CODE

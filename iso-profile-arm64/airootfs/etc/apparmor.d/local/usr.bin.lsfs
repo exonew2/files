@@ -1,0 +1,8 @@
+# /etc/apparmor.d/local/usr.bin.lsfs — Local AppArmor profile augmentation for LSFS
+# This file is read by the abstraction and can be used to add LSFS-specific rules
+#
+# LSFS (LLM-based Semantic File System) runs searches using natural language
+# against local vector DB. The profile restricts:
+#  - File system access to allowed directories
+#  - Network access to localhost only (Qdrant gRPC)
+#  - No ability to execute arbitrary code

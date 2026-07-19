@@ -1,0 +1,19 @@
+[Unit]
+Description=Ash Agent — AI Desktop Assistant
+Documentation=https://github.com/ash-linux/ash-iso
+After=network.target ollama.service
+BindsTo=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ash-agent/ash-agent.py
+Restart=on-failure
+RestartSec=5
+Nice=19
+IOSchedulingClass=idle
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

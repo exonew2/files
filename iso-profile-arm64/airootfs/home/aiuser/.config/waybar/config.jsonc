@@ -1,0 +1,161 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 32,
+  "spacing": 4,
+  "margin-top": 4,
+  "margin-left": 4,
+  "margin-right": 4,
+  "modules-left": ["custom/ai-agent", "hyprland/workspaces"],
+  "modules-center": ["custom/media", "clock"],
+  "modules-right": ["custom/ai-ollama", "custom/ai-qdrant", "custom/ai-lsfs", "pulseaudio", "network", "cpu", "memory", "battery", "tray", "custom/ash-menu"],
+
+  "hyprland/workspaces": {
+    "format": "{name}",
+    "on-click": "activate",
+    "format-icons": {
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10",
+      "urgent": "!"
+    },
+    "persistent_workspaces": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": [],
+      "9": [],
+      "10": []
+    },
+    "all-outputs": false,
+    "sort-by-number": true
+  },
+
+  "clock": {
+    "format": "{:%H:%M}",
+    "format-alt": "{:%H:%M  %a %d %b %Y}",
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "mon-format": "%b",
+      "days-format": "<span weight='bold'>{}</span>",
+      "format-alt": "{:%Y-%m-%d}"
+    },
+    "interval": 30
+  },
+
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-muted": " 0%",
+    "format-icons": {
+      "default": ["", "", ""]
+    },
+    "on-click": "pavucontrol",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "scroll-step": 5,
+    "tooltip-format": "{desc}"
+  },
+
+  "network": {
+    "format-wifi": " {essid}",
+    "format-ethernet": " {ipaddr}",
+    "format-disconnected": " Off",
+    "format-vpn": " {ifname}",
+    "tooltip-format": "{ifname} via {gwaddr}\nIP: {ipaddr}\nVPN: {vpn}",
+    "on-click": "nm-connection-editor",
+    "interval": 30
+  },
+
+  "cpu": {
+    "format": " {usage}%",
+    "interval": 5,
+    "tooltip-format": "CPU {usage}%\nLoad: {load}"
+  },
+
+  "memory": {
+    "format": " {percentage}%",
+    "interval": 10,
+    "tooltip-format": "RAM {percentage}%\n{used}/{total}"
+  },
+
+  "battery": {
+    "format": "{icon} {capacity}%",
+    "format-icons": ["", "", "", "", ""],
+    "format-charging": " {capacity}%",
+    "format-plugged": " {capacity}%",
+    "interval": 30,
+    "states": {
+      "warning": 20,
+      "critical": 10
+    },
+    "tooltip-format": "Battery {capacity}%\n{time}"
+  },
+
+  "custom/media": {
+    "format": "{icon} {}",
+    "return-type": "json",
+    "max-length": 50,
+    "exec": "playerctl -a metadata --format '{\"text\": \"{{artist}} — {{title}}\", \"tooltip\": \"{{playerName}}\", \"alt\": \"{{status}}\", \"class\": \"{{status}}\"}' 2>/dev/null || echo '{\"text\": \"\", \"alt\": \"\", \"class\": \"\"}'",
+    "on-click": "playerctl play-pause",
+    "on-click-right": "playerctl stop",
+    "on-scroll-up": "playerctl next",
+    "on-scroll-down": "playerctl previous",
+    "smooth-scrolling-threshold": 5
+  },
+
+  "custom/ai-agent": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 10,
+    "exec": "/usr/lib/ash-desktop/waybar-ai-status.sh agent",
+    "on-click": "kitty -e ash-agent --status"
+  },
+
+  "custom/ai-ollama": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 30,
+    "exec": "/usr/lib/ash-desktop/waybar-ai-status.sh ollama",
+    "on-click": "kitty -e bash -c 'ollama list; read -p \"Press Enter\"'",
+    "on-click-right": "ai-model-selector"
+  },
+
+  "custom/ai-qdrant": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 30,
+    "exec": "/usr/lib/ash-desktop/waybar-ai-status.sh qdrant",
+    "on-click": "kitty -e bash -c 'curl -s http://localhost:6333/collections | jq .; read -p \"Press Enter\"'"
+  },
+
+  "custom/ai-lsfs": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 60,
+    "exec": "/usr/lib/ash-desktop/waybar-ai-status.sh lsfs",
+    "on-click": "kitty -e bash -c 'ls /mnt/lsfs 2>/dev/null | head -50; read -p \"Press Enter\"'"
+  },
+
+  "custom/ash-menu": {
+    "format": "",
+    "interval": "once",
+    "on-click": "/usr/lib/ash-desktop/waybar-ash-menu.sh",
+    "tooltip": "Ash System Menu"
+  },
+
+  "tray": {
+    "icon-size": 16,
+    "spacing": 6
+  }
+}

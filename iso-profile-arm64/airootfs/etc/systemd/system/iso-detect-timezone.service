@@ -1,0 +1,13 @@
+[Unit]
+Description=Auto-detect Timezone
+After=network-online.target
+Wants=network-online.target
+Before=iso-firstboot.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/detect-timezone.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

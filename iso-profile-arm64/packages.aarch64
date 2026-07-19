@@ -1,0 +1,150 @@
+# ash ISO - Package List (ARM64 / aarch64)
+# Organized by category
+
+# === Base System ===
+base
+linux-aarch64
+linux-aarch64-headers
+linux-firmware
+base-devel
+sudo
+archlinux-keyring
+
+# === Shell & Tools ===
+nano
+vim
+vim-plug
+zsh
+fish
+ripgrep
+fd
+bat
+eza
+htop
+btop
+fzf
+zoxide
+starship
+
+# === Networking ===
+curl
+wget
+openssh
+networkmanager
+systemd-resolvconf
+openbsd-netcat
+socat
+
+# === Filesystem ===
+btrfs-progs
+snapper
+grub-btrfs
+
+# === Firewall ===
+firewalld
+
+# === Desktop: GNOME ===
+gnome-shell
+gdm
+gnome-terminal
+gnome-control-center
+gnome-tweaks
+gnome-system-monitor
+gnome-keyring
+seahorse
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+
+# === Desktop: Hyprland (optional) ===
+hyprland
+waybar
+kitty
+grim
+slurp
+wl-clipboard
+cliphist
+rofi
+dunst
+wlogout
+swaylock
+hyprpaper
+xdg-desktop-portal-hyprland
+qt5-wayland
+qt6-wayland
+polkit-kde-agent
+brightnessctl
+playerctl
+
+# === Audio ===
+pipewire
+wireplumber
+pipewire-pulse
+pavucontrol
+
+# === GPU Drivers (ARM optimized) ===
+mesa
+mesa-git
+mesa-utils
+xf86-video-fbdev
+xf86-video-armsoc
+
+# === VM Guest Agents ===
+spice-vdagent
+qemu-guest-agent
+
+# === Virtualization ===
+qemu-system-aarch64
+qemu-img
+qemu-user-static-binfmt
+edk2-aarch64
+virt-manager
+libvirt
+virtiofsd
+dnsmasq
+bridge-utils
+
+# === Container Runtimes ===
+docker
+docker-compose
+podman
+buildah
+skopeo
+distrobox
+podman-compose
+podman-machine
+
+# === AI / ML ===
+ollama
+llama.cpp
+qdrant
+
+# === Development Languages ===
+python
+python-pip
+python-gobject
+python-dbus
+nodejs
+npm
+pnpm
+go
+rust
+cargo
+
+# === Security & Signing ===
+minisign
+cosign
+sigstore
+slsa-verifier
+age
+
+# === Data Processing ===
+jq
+yq
+
+# === ISO Build Dependencies ===
+archiso
+mkinitcpio-archiso
+squashfs-tools
+
+# === AUR Helper ===
+paru

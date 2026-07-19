@@ -1,0 +1,59 @@
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'landing-page/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: landing-page/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: landing-page
+
+      - name: Get latest version
+        id: version
+        run: |
+          VERSION=$(curl -sf https://api.github.com/repos/ash-linux/ash/releases/latest | jq -r '.tag_name // "dev"')
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "PUBLIC_VERSION=${VERSION#v}" >> $GITHUB_ENV
+
+      - name: Build
+        run: npm run build
+        working-directory: landing-page
+        env:
+          PUBLIC_VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: landing-page/dist
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

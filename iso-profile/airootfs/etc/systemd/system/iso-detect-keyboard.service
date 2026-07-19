@@ -1,0 +1,12 @@
+[Unit]
+Description=Auto-detect Keyboard Layout
+After=display-manager.service
+Before=iso-firstboot.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/detect-keyboard.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

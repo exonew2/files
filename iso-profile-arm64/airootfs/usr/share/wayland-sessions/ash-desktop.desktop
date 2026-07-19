@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Ash Desktop
+Comment=Ash AI-Enhanced Desktop Environment
+Exec=/usr/lib/ash-desktop/ash-session
+Type=Application
+DesktopNames=ash
+Keywords=ai;wayland;development;ash;

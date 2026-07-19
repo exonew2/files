@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32">
+  <rect width="120" height="32" rx="4" fill="#ffebee"/>
+  <rect x="8" y="8" width="16" height="16" rx="3" fill="#d32f2f"/>
+  <polygon points="12,20 20,20 16,11" fill="#fff"/>
+  <rect x="15" y="15" width="2" height="4" rx="1" fill="#fff"/>
+  <text x="32" y="21" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="700" fill="#b71c1c">QEMU/KVM</text>
+</svg>

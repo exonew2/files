@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Verifying package signatures...
+When = PreTransaction
+Exec = /usr/bin/pacman-key --verify %F 2>&1 || /usr/bin/echo "WARNING: Signature verification for %v failed" >&2
+Depends = pacman
+AbortOnFail

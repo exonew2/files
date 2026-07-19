@@ -1,0 +1,30 @@
+# Wofi — Ash Launcher Config
+width=80%
+height=60%
+location=0
+columns=1
+spacing=8
+lines=15
+prompt=Ash Command Palette
+term=kitty
+allow_images=true
+show_all=true
+insensitive=true
+filter_rate=100
+sort_order=default
+hide_scroll=true
+cache_file=/dev/shm/ash-launcher-cache
+matching=fuzzy
+define=drun-format={icon} {name}
+define=run-format={cmd}
+key=Ctrl+Return: execute
+key=Alt+1: item 1
+key=Alt+2: item 2
+key=Alt+3: item 3
+key=Alt+4: item 4
+key=Alt+5: item 5
+key=Alt+6: item 6
+key=Alt+7: item 7
+key=Alt+8: item 8
+key=Alt+9: item 9
+key=Alt+0: item 10

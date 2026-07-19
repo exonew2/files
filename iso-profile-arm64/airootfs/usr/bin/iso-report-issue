@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+# /usr/bin/iso-report-issue
+set -euo pipefail
+
+/usr/lib/iso/collect-debug.sh
+ARCHIVE=$(ls -t ~/iso-debug-*.tar.gz | head -1)
+
+URL="https://github.com/ash-linux/ash/issues/new?template=bug_report.yml&title=[ISO+VM]%20$(hostname)%20$(date '+%Y-%m-%d')"
+xdg-open "$URL" 2>/dev/null || true
+
+zenity --info --title="Report Issue" --text="Debug logs saved to:\n$ARCHIVE\n\nPlease attach this file to the GitHub issue that opened in your browser." --width=500

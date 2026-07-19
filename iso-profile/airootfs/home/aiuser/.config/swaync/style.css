@@ -1,0 +1,192 @@
+/* SwayNC — Ash Notification Center */
+/* Catppuccin Mocha color scheme */
+
+* {
+  font-family: "JetBrains Mono Nerd Font", "JetBrains Mono", "Noto Sans", sans-serif;
+  font-size: 12px;
+}
+
+/* Control Center */
+.control-center {
+  background: rgba(24, 24, 37, 0.95);
+  border: 1px solid rgba(203, 166, 247, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 12px;
+}
+
+.control-center-title {
+  color: #cdd6f4;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 8px 4px;
+}
+
+.control-center-clear-all {
+  color: #f38ba8;
+  background: rgba(243, 139, 168, 0.1);
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+
+.control-center-clear-all:hover {
+  background: rgba(243, 139, 168, 0.2);
+}
+
+/* Notification */
+.notification {
+  background: rgba(30, 30, 46, 0.95);
+  border: 1px solid rgba(69, 71, 90, 0.6);
+  border-radius: 10px;
+  margin: 4px 0;
+  padding: 10px;
+  transition: all 0.2s ease;
+}
+
+.notification:hover {
+  border-color: rgba(203, 166, 247, 0.5);
+  background: rgba(49, 50, 68, 0.6);
+}
+
+.notification-default-action {
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.notification-action {
+  background: rgba(49, 50, 68, 0.6);
+  border: 1px solid rgba(69, 71, 90, 0.4);
+  border-radius: 6px;
+  color: #cdd6f4;
+  padding: 6px 12px;
+  margin: 2px;
+}
+
+.notification-action:hover {
+  background: rgba(137, 180, 250, 0.15);
+  border-color: #89b4fa;
+}
+
+/* Urgency levels */
+.notification.low {
+  border-left: 3px solid #6c7086;
+}
+
+.notification.normal {
+  border-left: 3px solid #89b4fa;
+}
+
+.notigration.critical {
+  border-left: 3px solid #f38ba8;
+  background: rgba(243, 139, 168, 0.08);
+}
+
+/* Notification content */
+.notification-content {
+  color: #cdd6f4;
+}
+
+.notification-default-action .notification-content .summary {
+  color: #cba6f7;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.notification-default-action .notification-content .body {
+  color: #bac2de;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.notification-default-action .notification-content .time {
+  color: #6c7086;
+  font-size: 11px;
+}
+
+/* Notification icon */
+.notification-default-action .notification-content .image {
+  border-radius: 8px;
+  margin-right: 10px;
+}
+
+/* Close button */
+.close-button {
+  color: #6c7086;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.close-button:hover {
+  color: #f38ba8;
+  background: rgba(243, 139, 168, 0.15);
+}
+
+/* DND */
+.dnd-button {
+  background: rgba(49, 50, 68, 0.6);
+  border: 1px solid rgba(69, 71, 90, 0.4);
+  border-radius: 6px;
+  color: #cdd6f4;
+  padding: 6px 12px;
+}
+
+.dnd-button.active {
+  background: rgba(243, 139, 168, 0.15);
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+
+/* Inhibitors */
+.inhibitors {
+  background: rgba(49, 50, 68, 0.4);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.inhibitors-text {
+  color: #f9e2af;
+  font-weight: bold;
+}
+
+/* MPRIS widget */
+.widget-mpris {
+  background: rgba(30, 30, 46, 0.8);
+  border: 1px solid rgba(203, 166, 247, 0.2);
+  border-radius: 10px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.widget-mpris-player {
+  padding: 4px;
+}
+
+.widget-mpris-title {
+  color: #cba6f7;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.widget-mpris-subtitle {
+  color: #a6adc8;
+  font-size: 11px;
+}
+
+/* Floating notification */
+.floating-notifications {
+  background: transparent;
+}
+
+.notification-group-wrapper {
+  margin: 4px 0;
+}
+
+.notification-group {
+  background: rgba(24, 24, 37, 0.95);
+  border: 1px solid rgba(69, 71, 90, 0.4);
+  border-radius: 10px;
+}

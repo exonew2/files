@@ -1,0 +1,50 @@
+# /etc/apparmor.d/usr.bin.ollama — AppArmor profile for Ollama
+# Sandboxes AI model execution within the ISO environment
+include <tunables/global>
+
+/usr/bin/ollama {
+    include <abstractions/base>
+    include <abstractions/nameservice>
+
+    # Ollama binary
+    /usr/bin/ollama mr,
+
+    # Ollama data directories
+    /usr/share/ollama/.ollama/** rwk,
+    /var/lib/ollama/** rwk,
+    /home/*/.ollama/** rwk,
+
+    # Ollama socket
+    /run/ollama/** rw,
+
+    # GPU access
+    /dev/dri/* rw,
+    /dev/nvidia* rw,
+    /dev/kfd rw,
+
+    # Model loading
+    /proc/sys/kernel/shmmax r,
+    /proc/sys/kernel/shmmni r,
+    /proc/sys/kernel/shmall r,
+
+    # Temp files
+    /tmp/ollama* rwk,
+    /tmp/** rw,
+
+    # Libraries
+    /usr/lib/ollama/** mr,
+    /usr/lib/** mr,
+
+    # Process management
+    signal (send) set=(kill,term,hup,int) peer=/usr/bin/ollama,
+    ptrace (trace) peer=/usr/bin/ollama,
+
+    # No network access for model execution (proxy through parent)
+    network tcp dgram,
+    deny network raw,
+
+    # No access to host system critical files
+    deny /etc/shadow rwklx,
+    deny /etc/gshadow rwklx,
+    deny /home/*/.ssh/** rwklx,
+}

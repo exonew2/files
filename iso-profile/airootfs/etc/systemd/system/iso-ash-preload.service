@@ -1,0 +1,17 @@
+[Unit]
+Description=ash-preload — App launch acceleration daemon
+Documentation=https://ash.sh
+After=network.target local-fs.target
+ConditionPathExists=/usr/lib/iso/ash-preload.sh
+
+[Service]
+Type=exec
+ExecStart=/usr/lib/iso/ash-preload.sh start
+ExecStop=/usr/lib/iso/ash-preload.sh stop
+ExecReload=/usr/lib/iso/ash-preload.sh refresh
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

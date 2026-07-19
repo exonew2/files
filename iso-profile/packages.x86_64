@@ -1,0 +1,199 @@
+# ash ISO - Package List
+# Organized by category
+
+# === Base System ===
+base
+linux
+linux-firmware
+linux-headers
+base-devel
+sudo
+archlinux-keyring
+
+# === Shell & Tools ===
+vim
+vim-plug
+zsh
+fish
+ripgrep
+fd
+bat
+eza
+btop
+fzf
+zoxide
+starship
+
+# === Networking ===
+curl
+wget
+openssh
+networkmanager
+systemd-resolvconf
+openbsd-netcat
+socat
+
+# === Filesystem ===
+btrfs-progs
+snapper
+grub-btrfs
+
+# === Firewall ===
+firewalld
+
+# === Desktop: GNOME ===
+gnome-shell
+gdm
+gnome-control-center
+gnome-keyring
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+
+# === Desktop: Hyprland (optional) ===
+hyprland
+waybar
+kitty
+grim
+slurp
+wl-clipboard
+cliphist
+rofi
+wofi
+dunst
+swaync
+wlogout
+swaylock
+hyprpaper
+xdg-desktop-portal-hyprland
+qt5-wayland
+qt6-wayland
+polkit-kde-agent
+brightnessctl
+playerctl
+
+# === Audio ===
+pipewire
+wireplumber
+pipewire-pulse
+pavucontrol
+
+# === GPU Drivers ===
+mesa
+vulkan-radeon
+vulkan-intel
+nvidia
+nvidia-utils
+nvidia-settings
+
+# === VM Guest Agents ===
+open-vm-tools
+vmware-vmblock-fuse
+virtualbox-guest-utils
+spice-vdagent
+qemu-guest-agent
+
+# === Virtualization ===
+qemu-system-x86_64
+qemu-img
+qemu-user-static-binfmt
+ovmf
+edk2-ovmf
+virt-manager
+libvirt
+virtiofsd
+ebtables
+dnsmasq
+bridge-utils
+
+# === Container Runtimes ===
+docker
+docker-compose
+podman
+buildah
+skopeo
+distrobox
+podman-compose
+podman-machine
+
+# === Fonts ===
+ttf-jetbrains-mono
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-emoji
+ttf-noto-sans
+ttf-noto-serif
+
+# === Plymouth ===
+plymouth
+
+# === Icon Themes ===
+papirus-icon-theme
+
+# === AI / ML ===
+ollama
+llama.cpp
+qdrant
+python-psutil
+python-yaml
+
+# === AI Desktop Integration ===
+wofi
+swaync
+libdbusmenu-glib
+
+# === Development Languages ===
+python
+python-pip
+python-gobject
+python-dbus
+nodejs
+npm
+pnpm
+go
+rust
+cargo
+gh
+git-lfs
+act
+docker-buildx
+terraform
+ansible
+jupyter-lab
+python-polars
+python-pydantic
+python-sqlalchemy
+python-httpx
+python-pytest
+python-pytest-asyncio
+python-ruff
+python-pydantic-settings
+python-textual
+rust-analyzer
+gopls
+typescript-language-server
+pre-commit
+actionlint
+groff
+
+# === Security & Signing ===
+minisign
+cosign
+sigstore
+slsa-verifier
+age
+
+# === Data Processing ===
+jq
+yq
+
+# === ISO Build Dependencies ===
+archiso
+mkinitcpio-archiso
+squashfs-tools
+
+# === FUSE / LSFS ===
+fuse3
+python-fusepy
+
+# === AUR Helper ===
+paru

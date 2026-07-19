@@ -1,0 +1,15 @@
+[Unit]
+Description=ISO User Customization (Config Drive/USB/GuestInfo)
+After=iso-firstboot.service
+Wants=iso-firstboot.service
+ConditionPathExists=!/etc/iso-customize-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/customize-firstboot.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

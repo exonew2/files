@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
+
+VERSION="1.0.0"
+ASH_DIR="${HOME}/.ash"
+SNAPSHOT_DIR="/.ash-snapshots"
+STOW_DIR="${ASH_DIR}/dotfiles"
+STOW_TARGET="${HOME}"
+
+usage() {
+    cat <<EOF
+ash-conf — Declarative System Configuration v${VERSION}
+
+Usage:
+  ash-conf apply     Apply all configs from ~/.ash/
+  ash-conf diff      Show pending changes
+  ash-conf rollback  Rollback to last snapshot
+  ash-conf export    Export config as portable archive
+  ash-conf help      Show this help
+EOF
+    exit 0
+}
+
+ensure_dirs() {
+    mkdir -p "${ASH_DIR}"/{dotfiles,scripts}
+}
+
+apply_packages() {
+    local pkg_file="${ASH_DIR}/packages.toml"
+    [[ -f "$pkg_file" ]] || return 0
+    echo -e "${BLUE}[packages]${NC} Applying package configuration..."
+
+    # Parse TOML using a simple grep approach (TOML is simple enough)
+    local pkgs=()
+    while IFS='=' read -r key val; do
+        key="${key//\"/}"; val="${val//\"/}"
+        key="${key// /}"; val="${val// /}"
+        [[ "$key" == "add" ]] && pkgs+=("$val")
+    done < <(grep -E '^[a-zA-Z]' "$pkg_file")
+
+    if [[ ${#pkgs[@]} -gt 0 ]]; then
+        echo -e "  Installing: ${pkgs[*]}"
+        sudo pacman -S --noconfirm "${pkgs[@]}" 2>/dev/null || paru -S --noconfirm "${pkgs[@]}" 2>/dev/null || true
+    fi
+}
+
+apply_services() {
+    local svc_file="${ASH_DIR}/services.toml"
+    [[ -f "$svc_file" ]] || return 0
+    echo -e "${BLUE}[services]${NC} Applying service configuration..."
+
+    while IFS='=' read -r key val; do
+        key="${key//\"/}"; val="${val//\"/}"
+        key="${key// /}"; val="${val// /}"
+        case "$val" in
+            enable)  sudo systemctl enable --now "$key" 2>/dev/null || true ;;
+            disable) sudo systemctl disable --now "$key" 2>/dev/null || true ;;
+        esac
+    done < <(grep -E '^[a-zA-Z]' "$svc_file")
+}
+
+apply_dotfiles() {
+    [[ -d "$STOW_DIR" ]] || return 0
+    local has_files
+    has_files=$(find "$STOW_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)
+    [[ -n "$has_files" ]] || return 0
+    echo -e "${BLUE}[dotfiles]${NC} Stowing dotfiles..."
+    (cd "$(dirname "$STOW_DIR")" && stow -R -t "$STOW_TARGET" "$(basename "$STOW_DIR")" 2>/dev/null) || true
+    echo -e "  ${GREEN}Dotfiles applied via GNU Stow${NC}"
+}
+
+apply_scripts() {
+    local script_dir="${ASH_DIR}/scripts"
+    [[ -d "$script_dir" ]] || return 0
+    echo -e "${BLUE}[scripts]${NC} Linking user scripts..."
+    for s in "$script_dir"/*; do
+        [[ -f "$s" && -x "$s" ]] || continue
+        local name
+        name=$(basename "$s")
+        sudo ln -sf "$s" "/usr/local/bin/$name" 2>/dev/null || true
+        echo -e "  Linked ${CYAN}$name${NC}"
+    done
+}
+
+create_snapshot() {
+    local label="ash-conf-$(date +%Y%m%d-%H%M%S)"
+    if command -v btrfs &>/dev/null && btrfs filesystem show / &>/dev/null; then
+        sudo btrfs subvolume snapshot -r / "${SNAPSHOT_DIR}/${label}" 2>/dev/null || true
+        echo -e "${GREEN}Snapshot created: ${CYAN}${label}${NC}"
+    else
+        # Fallback: tar-based snapshot
+        mkdir -p "${SNAPSHOT_DIR}"
+        tar czf "${SNAPSHOT_DIR}/${label}.tar.gz" -C / etc/home 2>/dev/null || true
+        echo -e "${YELLOW}Tar snapshot created: ${CYAN}${label}${NC}"
+    fi
+}
+
+cmd_apply() {
+    ensure_dirs
+    create_snapshot
+    apply_packages
+    apply_services
+    apply_dotfiles
+    apply_scripts
+    echo -e "${GREEN}All configs applied${NC}"
+}
+
+cmd_diff() {
+    local pkg_file="${ASH_DIR}/packages.toml"
+    [[ -f "$pkg_file" ]] || { echo "No packages.toml found"; exit 0; }
+    echo -e "${BLUE}Packages to add:${NC}"
+    while IFS='=' read -r key val; do
+        key="${key//\"/}"; val="${val//\"/}"
+        key="${key// /}"; val="${val// /}"
+        [[ "$key" == "add" ]] && echo "  + $val"
+    done < <(grep -E '^[a-zA-Z]' "$pkg_file")
+
+    echo -e "${BLUE}Services to configure:${NC}"
+    local svc_file="${ASH_DIR}/services.toml"
+    [[ -f "$svc_file" ]] && while IFS='=' read -r key val; do
+        key="${key//\"/}"; val="${val//\"/}"
+        key="${key// /}"; val="${val// /}"
+        echo "  $key → $val"
+    done < <(grep -E '^[a-zA-Z]' "$svc_file")
+}
+
+cmd_rollback() {
+    if command -v btrfs &>/dev/null && [[ -d "$SNAPSHOT_DIR" ]]; then
+        local latest
+        latest=$(ls -1t "$SNAPSHOT_DIR" 2>/dev/null | head -1)
+        [[ -z "$latest" ]] && { echo -e "${RED}No snapshots found${NC}"; exit 1; }
+        echo -e "${YELLOW}Rolling back to: ${CYAN}${latest}${NC}"
+        sudo btrfs subvolume delete / 2>/dev/null || true
+        # In real btrfs setups, you'd use snapper or grub-btrfs to boot into snapshot
+        echo -e "${YELLOW}Reboot into snapshot via grub-btrfs boot entry${NC}"
+    else
+        echo -e "${YELLOW}Btrfs not available — manual rollback required${NC}"
+    fi
+}
+
+cmd_export() {
+    local out="${1:-ash-config-export-$(date +%Y%m%d).tar.gz}"
+    ensure_dirs
+    tar czf "$out" -C "$(dirname "$ASH_DIR")" "$(basename "$ASH_DIR")"
+    echo -e "${GREEN}Config exported: ${CYAN}${out}${NC}"
+}
+
+# ─── CLI ──────────────────────────────────────────────────────────
+[[ $# -eq 0 ]] && { usage; exit 0; }
+
+case "$1" in
+    apply)    cmd_apply ;;
+    diff)     cmd_diff ;;
+    rollback) cmd_rollback ;;
+    export)   cmd_export "${2:-}" ;;
+    help|-h)  usage ;;
+    *)        echo -e "${RED}Unknown command: $1${NC}"; usage; exit 1 ;;
+esac

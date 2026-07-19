@@ -1,0 +1,13 @@
+[Unit]
+Description=Pull Default Ollama Model (phi3:mini)
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c 'sleep 30 && ollama pull llama3.1:8b 2>&1 | logger -t ollama-pull'
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

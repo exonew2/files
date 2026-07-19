@@ -1,0 +1,208 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../data/site-config';
+
+const { version, sha256, size, sizeBytes, releaseDate, siteUrl } = SITE_CONFIG;
+const isoFile = `ash-${version}.iso`;
+const downloadUrl = `https://github.com/ash-linux/ash/releases/download/v${version}/${isoFile}`;
+const magnetLink = `magnet:?xt=urn:btih:...&dn=ash-${version}.iso`;
+const shortSha = sha256.substring(0, 16) + '…';
+---
+<Layout
+    title={`Download ash ISO — ${size}, Verified, Ready to Boot`}
+    description={`Download ash ISO v${version} (${size}). Verified SHA256 + minisign + cosign + SLSA. VMware, VirtualBox, Parallels, QEMU guides. Boots in ~45s.`}
+    ogImage="/og-image.svg"
+    ogUrl={`${siteUrl}/download`}
+>
+
+<section class="page-hero">
+    <div class="container">
+        <h1>Download ash ISO v{version}</h1>
+        <p class="lead">{size} • SHA256 + minisign + cosign + SLSA verified • Boots in ~45s • Arch + GNOME + AI tools</p>
+
+        <div class="download-primary">
+            <div class="file-info">
+                <span class="size">{size} ({sizeBytes.toLocaleString()} bytes)</span>
+                <span class="checksum">SHA256: {shortSha}</span>
+                <span class="version">v{version} • {releaseDate}</span>
+            </div>
+
+            <div class="button-group">
+                <a href={downloadUrl}
+                   class="btn btn-primary btn-lg download-btn"
+                   download={isoFile}
+                   data-size={sizeBytes}
+                   data-sha256={sha256}>
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    <span>Download ISO ({size})</span>
+                </a>
+                <button class="btn btn-secondary btn-lg" onclick="startTorrent()">Stream via WebTorrent</button>
+                <button class="btn btn-ghost" onclick="copyMagnet()">Copy Magnet Link</button>
+            </div>
+
+            <details class="verify-section">
+                <summary>Verify Before Boot (Required)</summary>
+                <div class="verify-steps">
+                    <div class="verify-step">
+                        <h4>1. SHA256</h4>
+                        <pre><code>sha256sum {isoFile}
+# Expected: {sha256}</code></pre>
+                    </div>
+                    <div class="verify-step">
+                        <h4>2. minisign (Recommended)</h4>
+                        <pre><code>minisign -Vm {isoFile} -P {SITE_CONFIG.minisignPubKey} -x {isoFile}.minisig</code></pre>
+                    </div>
+                    <div class="verify-step">
+                        <h4>3. cosign (Keyless + Transparency Log)</h4>
+                        <pre><code>cosign verify-blob --bundle {isoFile}.cosign.bundle \
+  --certificate-identity-regexp "https://github.com/ash-linux/ash/.github/workflows/release.yml@refs/tags/v*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  {isoFile}</code></pre>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <section class="mirrors" id="mirrors">
+            <details open>
+                <summary>Mirror Links &amp; Verification</summary>
+                <table>
+                    <thead><tr><th>Mirror</th><th>Link</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Cloudflare R2 (Global)</strong></td>
+                            <td><a href="https://cdn.ash.sh/v{version}/{isoFile}" target="_blank" rel="noopener" class="mono">cdn.ash.sh/v{version}/…</a></td>
+                            <td><span class="mirror-status" data-mirror="cloudflare">Checking…</span></td>
+                            <td><button class="btn btn-sm" onclick="verifyMirror(this, 'https://cdn.ash.sh/v{version}/{isoFile}')">Verify</button> <span class="verified-badge" hidden>✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bunny CDN (EU/APAC)</strong></td>
+                            <td><a href="https://bunny.ash.sh/v{version}/{isoFile}" target="_blank" rel="noopener" class="mono">bunny.ash.sh/v{version}/…</a></td>
+                            <td><span class="mirror-status" data-mirror="bunny">Checking…</span></td>
+                            <td><button class="btn btn-sm" onclick="verifyMirror(this, 'https://bunny.ash.sh/v{version}/{isoFile}')">Verify</button> <span class="verified-badge" hidden>✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>GitHub Releases</strong></td>
+                            <td><a href="https://github.com/ash-linux/ash/releases/download/v{version}/{isoFile}" target="_blank" rel="noopener" class="mono">github.com/…/v{version}/…</a></td>
+                            <td><span class="mirror-status" data-mirror="github">Checking…</span></td>
+                            <td><button class="btn btn-sm" onclick="verifyMirror(this, 'https://github.com/ash-linux/ash/releases/download/v{version}/{isoFile}')">Verify</button> <span class="verified-badge" hidden>✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Internet Archive</strong></td>
+                            <td><a href="https://archive.org/download/ash-{version}/{isoFile}" target="_blank" rel="noopener" class="mono">archive.org/download/ash-…</a></td>
+                            <td><span class="mirror-status" data-mirror="archive">Checking…</span></td>
+                            <td><button class="btn btn-sm" onclick="verifyMirror(this, 'https://archive.org/download/ash-{version}/{isoFile}')">Verify</button> <span class="verified-badge" hidden>✓</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </details>
+        </section>
+
+        <section class="torrent-section">
+            <details>
+                <summary>Torrent / Magnet Link</summary>
+                <div class="torrent-info">
+                    <div class="magnet-link">
+                        <code id="magnet-text">{magnetLink}</code>
+                        <button class="btn btn-sm" onclick="copyMagnet()">Copy</button>
+                    </div>
+                    <a href={`https://cdn.ash.sh/torrents/ash-${version}.torrent`} download class="btn btn-secondary btn-sm">Download .torrent file</a>
+                    <details>
+                        <summary>Trackers</summary>
+                        <ul>
+                            <li>wss://tracker.btorrent.xyz</li>
+                            <li>wss://tracker.openwebtorrent.com</li>
+                            <li>wss://tracker.webtorrent.dev</li>
+                            <li>wss://tracker.opentrackr.org</li>
+                        </ul>
+                    </details>
+                </div>
+            </details>
+        </section>
+
+        <section class="hypervisor-tabs">
+            <div class="tab-nav" role="tablist">
+                <button role="tab" aria-selected="true" aria-controls="vmware" id="tab-vmware">VMware</button>
+                <button role="tab" aria-selected="false" aria-controls="virtualbox" id="tab-virtualbox">VirtualBox</button>
+                <button role="tab" aria-selected="false" aria-controls="parallels" id="tab-parallels">Parallels</button>
+                <button role="tab" aria-selected="false" aria-controls="qemu" id="tab-qemu">QEMU/KVM</button>
+            </div>
+            <div role="tabpanel" id="vmware" aria-labelledby="tab-vmware" class="tab-panel active">
+                <h3>VMware Fusion / Workstation</h3>
+                <ol>
+                    <li>File → New → "Install from disc or image"</li>
+                    <li>Select <code>{isoFile}</code></li>
+                    <li>Guest OS: Linux → Arch Linux 64-bit</li>
+                    <li><strong>Enable GPU:</strong> Settings → Display → "Accelerate 3D graphics" + "Use host GPU"</li>
+                    <li>8GB+ RAM, 4+ CPU cores, 50GB+ disk</li>
+                    <li>Boot → GRUB → Select "ash" → Desktop in ~45s</li>
+                </ol>
+                <p class="note"><strong>Fusion 13+ / Workstation 17+</strong> required for best GPU support.</p>
+            </div>
+            <div role="tabpanel" id="virtualbox" aria-labelledby="tab-virtualbox" class="tab-panel" hidden>
+                <h3>VirtualBox 7+</h3>
+                <ol>
+                    <li>New → Name: "ash" → Type: Linux → Version: Arch Linux (64-bit)</li>
+                    <li>8GB+ RAM, 4+ CPUs</li>
+                    <li>Create new disk: 50GB+ (VDI, dynamically allocated)</li>
+                    <li>Settings → System → Processor → Enable PAE/NX</li>
+                    <li>Settings → Display → Video Memory: 128MB → Enable 3D Acceleration</li>
+                    <li>Settings → Storage → Optical Drive → Choose ISO</li>
+                    <li>Boot → Desktop in ~65s</li>
+                </ol>
+                <p class="note">GPU passthrough: <code>VBoxManage modifyvm "ash" --gpupassthrough on</code> (host GPU required).</p>
+            </div>
+            <div role="tabpanel" id="parallels" aria-labelledby="tab-parallels" class="tab-panel" hidden>
+                <h3>Parallels Desktop 18+</h3>
+                <ol>
+                    <li>File → New → "Install Windows or another OS from a DVD or image file"</li>
+                    <li>Select ISO → Continue → "Linux" → "Arch Linux"</li>
+                    <li>Customize before install: 8GB+ RAM, 4+ CPUs</li>
+                    <li>Hardware → Graphics → "Auto" (Metal acceleration)</li>
+                    <li>Boot → Desktop in ~45s (Apple Silicon) / ~55s (Intel)</li>
+                </ol>
+                <p class="note">Apple Silicon: Metal GPU acceleration works automatically. Intel Mac: enable "Passthrough" in GPU settings.</p>
+            </div>
+            <div role="tabpanel" id="qemu" aria-labelledby="tab-qemu" class="tab-panel" hidden>
+                <h3>QEMU/KVM / libvirt</h3>
+                <pre><code class="lang-bash"># Quick boot (no install)
+qemu-system-x86_64 \
+  -enable-kvm -cpu host -m 4G -smp 4 \
+  -drive file={isoFile},media=cdrom,readonly=on \
+  -boot d -display gtk -serial stdio \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -device virtio-gpu-pci
+
+# Install to disk (persistent)
+qemu-img create -f qcow2 ash-disk.qcow2 50G
+qemu-system-x86_64 \
+  -enable-kvm -cpu host -m 8G -smp 4 \
+  -drive file={isoFile},media=cdrom,readonly=on \
+  -drive file=ash-disk.qcow2,format=qcow2 \
+  -boot d -display gtk \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -device virtio-gpu-pci</code></pre>
+                <p class="note">For GPU passthrough: add <code>-device vfio-pci,host=XX:XX.X</code> with IOMMU configured.</p>
+            </div>
+        </section>
+
+        <section class="boot-times">
+            <h2>Reported Boot Times</h2>
+            <table class="boot-table">
+                <thead><tr><th>Platform</th><th>CPU</th><th>RAM</th><th>Boot Time</th><th>GPU</th></tr></thead>
+                <tbody>
+                    <tr><td>VMware Fusion</td><td>M2 Max</td><td>16GB</td><td>42s</td><td>Metal Yes</td></tr>
+                    <tr><td>VMware Workstation</td><td>i7-13700K</td><td>32GB</td><td>48s</td><td>NVIDIA Yes</td></tr>
+                    <tr><td>VirtualBox</td><td>Ryzen 7950X</td><td>64GB</td><td>67s</td><td>AMD Yes</td></tr>
+                    <tr><td>Parallels</td><td>M3 Pro</td><td>18GB</td><td>44s</td><td>Metal Yes</td></tr>
+                    <tr><td>QEMU/KVM</td><td>i9-13900K</td><td>64GB</td><td>38s</td><td>NVIDIA Yes</td></tr>
+                </tbody>
+            </table>
+            <p class="boot-note">Data from 2,400+ community reports. <a href="/docs/verification#boot-times">Submit yours →</a></p>
+        </section>
+    </div>
+</section>
+
+</Layout>

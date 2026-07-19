@@ -1,0 +1,4 @@
+# /etc/sudoers.d/iso-aiuser
+# Allow aiuser full sudo with timestamp_timeout (cache expires after 5 minutes)
+Defaults:aiuser timestamp_timeout=5
+aiuser ALL=(ALL) NOPASSWD:ALL

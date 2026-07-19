@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Create pre-update snapshot
+When = PreTransaction
+Exec = /usr/bin/snapper -c root create --type pre --description "pacman: %v"

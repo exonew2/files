@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export XDG_CURRENT_DESKTOP=ash
+export XDG_SESSION_DESKTOP=ash
+export XDG_SESSION_TYPE=wayland
+export ASH_HOME=/usr/lib/ash-desktop
+export ASH_VERSION=1.0
+
+log() { logger -t ash-session "$*"; }
+log "Starting Ash Desktop session"
+
+# Start ash-agent if available
+if command -v ash-agent &>/dev/null; then
+    ash-agent --daemon &
+    log "ash-agent started"
+fi
+
+# Mount LSFS filesystem
+if command -v lsfs &>/dev/null; then
+    mkdir -p /mnt/lsfs
+    if ! mountpoint -q /mnt/lsfs 2>/dev/null; then
+        lsfs mount /mnt/lsfs &
+        sleep 1
+        log "LSFS mounted at /mnt/lsfs"
+    fi
+fi
+
+# Launch onboarding on first boot
+FIRST_BOOT_FLAG="$HOME/.config/ash/.onboarding-complete"
+if [ ! -f "$FIRST_BOOT_FLAG" ] && [ -x /usr/lib/ash-desktop/ash-onboarding ]; then
+    /usr/lib/ash-desktop/ash-onboarding &
+fi
+
+cleanup() {
+    log "Shutting down Ash Desktop"
+    if mountpoint -q /mnt/lsfs 2>/dev/null; then
+        fusermount -u /mnt/lsfs 2>/dev/null || umount /mnt/lsfs 2>/dev/null || true
+        log "LSFS unmounted"
+    fi
+    if command -v ash-agent &>/dev/null; then
+        ash-agent --stop 2>/dev/null || true
+        log "ash-agent stopped"
+    fi
+    wait
+}
+
+trap cleanup EXIT INT TERM
+
+exec Hyprland "$@"

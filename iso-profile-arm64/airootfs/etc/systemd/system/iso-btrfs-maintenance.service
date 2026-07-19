@@ -1,0 +1,9 @@
+[Unit]
+Description=Btrfs maintenance — trim, dedup, balance
+ConditionPathExists=/
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/btrfs-maintenance.sh
+StandardOutput=journal
+StandardError=journal

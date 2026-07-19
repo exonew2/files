@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for snapshot changes
+
+[Path]
+PathModified=/etc/grub-btrfs/config
+PathModified=/.snapshots
+
+[Install]
+WantedBy=multi-user.target

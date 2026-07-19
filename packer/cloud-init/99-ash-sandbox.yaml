@@ -1,0 +1,41 @@
+# /etc/cloud/cloud.cfg.d/99-ash-sandbox.yaml
+#cloud-config
+package_update: true
+packages:
+  - docker
+  - nvidia-container-toolkit
+  - btrfs-progs
+  - qemu-guest-agent
+
+write_files:
+  - path: /etc/ash-sandbox/config.yaml
+    content: |
+      model_router:
+        endpoint: "https://router.ash.sh"
+        models:
+          - "deepseek-coder:33b"
+          - "codellama:34b"
+          - "qwen2.5-coder:32b"
+      vector_memory:
+        path: "/var/lib/ash-sandbox/vectors"
+        backend: "chromadb"
+      firewall:
+        enabled: true
+        profile: "ai-sandbox"
+
+runcmd:
+  - systemctl enable --now docker
+  - systemctl enable --now qemu-guest-agent
+  - mkdir -p /var/lib/ash-sandbox/{models,vectors,projects}
+  - btrfs subvolume create /var/lib/ash-sandbox/models
+  - btrfs subvolume create /var/lib/ash-sandbox/vectors
+  - docker pull ghcr.io/ash-linux/router:latest
+  - docker pull ghcr.io/ash-linux/vector-db:latest
+  - systemctl enable --now ash-sandbox-router
+
+users:
+  - name: builder
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - "{{ssh_public_key}}"

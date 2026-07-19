@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# ash-agent-start — Start Ash agent daemon on desktop login
+set -euo pipefail
+
+log() { logger -t ash-agent-start "$*"; }
+
+if command -v ash-agent &>/dev/null; then
+    if ! pgrep -x ash-agent &>/dev/null; then
+        ash-agent --daemon &
+        log "ash-agent started"
+    else
+        log "ash-agent already running"
+    fi
+else
+    log "ash-agent not found (not installed)"
+fi

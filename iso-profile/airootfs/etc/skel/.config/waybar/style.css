@@ -1,0 +1,283 @@
+* {
+  border: none;
+  border-radius: 0;
+  font-family: "JetBrains Mono Nerd Font", "JetBrains Mono", "Noto Sans", "sans-serif";
+  font-size: 12px;
+  min-height: 0;
+}
+
+window#waybar {
+  background: rgba(17, 17, 27, 0.75);
+  border-radius: 12px;
+  border: 1px solid rgba(203, 166, 247, 0.3);
+  color: #cdd6f4;
+  transition-property: background-color, border-color;
+  transition-duration: 0.5s;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+window#waybar.hidden {
+  opacity: 0.2;
+}
+
+window#waybar.empty {
+  background: rgba(17, 17, 27, 0.5);
+}
+
+/* Workspaces */
+#workspaces {
+  margin: 0 2px;
+  background: rgba(49, 50, 68, 0.4);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+#workspaces button {
+  padding: 0 6px;
+  margin: 1px 2px;
+  background: transparent;
+  color: #585b70;
+  border-radius: 6px;
+  border: none;
+  min-width: 22px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+#workspaces button:hover {
+  background: rgba(203, 166, 247, 0.15);
+  color: #cdd6f4;
+}
+
+#workspaces button.active {
+  background: linear-gradient(135deg, rgba(203, 166, 247, 0.3), rgba(137, 180, 250, 0.2));
+  color: #cba6f7;
+  font-weight: bold;
+}
+
+#workspaces button.urgent {
+  background: rgba(243, 139, 168, 0.3);
+  color: #f38ba8;
+  animation: urgent-pulse 1s ease infinite;
+}
+
+@keyframes urgent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+#workspaces button.empty {
+  color: #313244;
+}
+
+/* AI Agent */
+#custom-ai-agent {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #a6e3a1;
+  font-size: 13px;
+}
+
+#custom-ai-agent.ai-idle {
+  color: #6c7086;
+}
+
+/* AI Ollama */
+#custom-ai-ollama {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #89b4fa;
+  font-size: 12px;
+}
+
+#custom-ai-ollama.ai-idle {
+  color: #6c7086;
+}
+
+#custom-ai-ollama.ai-down {
+  color: #f38ba8;
+}
+
+/* AI Qdrant */
+#custom-ai-qdrant {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #cba6f7;
+  font-size: 12px;
+}
+
+#custom-ai-qdrant.ai-down {
+  color: #f38ba8;
+}
+
+#custom-ai-qdrant.ai-idle {
+  color: #6c7086;
+}
+
+/* AI LSFS */
+#custom-ai-lsfs {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #f9e2af;
+  font-size: 12px;
+}
+
+#custom-ai-lsfs.ai-idle {
+  color: #6c7086;
+}
+
+/* Clock */
+#clock {
+  margin: 0 8px;
+  color: #f5e0dc;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+/* PulseAudio */
+#pulseaudio {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #a6e3a1;
+  border-radius: 6px;
+}
+
+#pulseaudio.muted {
+  color: #f38ba8;
+  background: rgba(243, 139, 168, 0.1);
+}
+
+/* Network */
+#network {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #89b4fa;
+  border-radius: 6px;
+}
+
+#network.disconnected {
+  color: #f38ba8;
+}
+
+#network.vpn {
+  color: #a6e3a1;
+}
+
+/* CPU */
+#cpu {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #fab387;
+  border-radius: 6px;
+}
+
+#cpu.warning {
+  color: #f38ba8;
+}
+
+/* Memory */
+#memory {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #f9e2af;
+  border-radius: 6px;
+}
+
+#memory.warning {
+  color: #f38ba8;
+}
+
+/* Battery */
+#battery {
+  margin: 0 2px;
+  padding: 0 8px;
+  color: #a6e3a1;
+  border-radius: 6px;
+}
+
+#battery.warning {
+  color: #fab387;
+}
+
+#battery.critical {
+  color: #f38ba8;
+}
+
+#battery.charging {
+  color: #a6e3a1;
+}
+
+#battery.plugged {
+  color: #89b4fa;
+}
+
+/* Media */
+#custom-media {
+  margin: 0 4px;
+  padding: 0 8px;
+  color: #cba6f7;
+  font-style: italic;
+  border-radius: 6px;
+}
+
+#custom-media.playing {
+  color: #a6e3a1;
+}
+
+#custom-media.paused {
+  color: #6c7086;
+}
+
+/* Ash Menu */
+#custom-ash-menu {
+  margin: 0 2px;
+  padding: 0 10px;
+  color: #cba6f7;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+#custom-ash-menu:hover {
+  background: rgba(203, 166, 247, 0.15);
+}
+
+/* Tray */
+#tray {
+  margin: 0 2px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+#tray menu {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+}
+
+#tray > .passive {
+  -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+  -gtk-icon-effect: highlight;
+  animation: tray-attention 1s ease infinite;
+}
+
+@keyframes tray-attention {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Tooltip */
+tooltip {
+  background: rgba(24, 24, 37, 0.95);
+  border: 1px solid rgba(203, 166, 247, 0.3);
+  border-radius: 8px;
+  color: #cdd6f4;
+  font-family: "JetBrains Mono Nerd Font", "JetBrains Mono", sans-serif;
+  font-size: 12px;
+  padding: 8px;
+}

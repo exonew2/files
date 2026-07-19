@@ -1,0 +1,13 @@
+# /etc/udev/rules.d/99-vm-guest.rules
+# VMware
+SUBSYSTEM=="vmci", MODE="0660", GROUP="vmci"
+SUBSYSTEM=="vsock", MODE="0660", GROUP="vsock"
+# VirtualBox
+SUBSYSTEM=="vboxguest", MODE="0660", GROUP="vboxsf"
+# QEMU/KVM
+SUBSYSTEM=="virtio-ports", MODE="0660", GROUP="kvm"
+KERNEL=="vhost-vsock", MODE="0660", GROUP="kvm"
+# SPICE
+SUBSYSTEM=="virtio-ports", ATTR{name}=="com.redhat.spice.0", MODE="0660", GROUP="spice"
+# VirtIO-FS
+SUBSYSTEM=="virtio-fs", MODE="0660", GROUP="kvm"

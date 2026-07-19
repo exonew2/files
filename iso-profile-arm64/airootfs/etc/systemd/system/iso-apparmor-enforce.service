@@ -1,0 +1,15 @@
+[Unit]
+Description=Enforce AppArmor profiles for ISO services
+Documentation=https://wiki.archlinux.org/title/AppArmor
+After=apparmor.service
+Requires=apparmor.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/aa-enforce /etc/apparmor.d/usr.bin.ollama
+ExecStart=/usr/sbin/aa-enforce /etc/apparmor.d/usr.bin.qdrant
+ExecStartPost=/usr/bin/notify-send "AppArmor" "Profiles enforced: ollama, qdrant" --icon=security-low
+
+[Install]
+WantedBy=multi-user.target

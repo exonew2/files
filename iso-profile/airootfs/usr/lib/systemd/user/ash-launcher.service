@@ -1,0 +1,19 @@
+[Unit]
+Description=Ash Launcher — AI Application Launcher
+Documentation=https://github.com/ash-linux/ash-iso
+After=graphical-session.target
+BindsTo=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ash-launcher/ash-launcher.py
+Restart=on-failure
+RestartSec=10
+Nice=19
+IOSchedulingClass=idle
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

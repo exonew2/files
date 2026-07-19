@@ -1,0 +1,12 @@
+[Unit]
+Description=Lock Down SSH After Packer Provisioning
+ConditionPathExists=/etc/iso-packer-done
+After=iso-firstboot.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c 'sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config.d/iso-hardening.conf && sed -i "s/^AuthenticationMethods publickey,password/AuthenticationMethods publickey/" /etc/ssh/sshd_config.d/iso-hardening.conf && systemctl reload sshd'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

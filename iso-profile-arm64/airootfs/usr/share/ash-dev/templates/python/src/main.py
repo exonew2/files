@@ -1,0 +1,13 @@
+from fastapi import FastAPI
+
+app = FastAPI(title="{{project_name}}", version="0.1.0")
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello from {{project_name}}"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}

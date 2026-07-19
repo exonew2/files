@@ -1,0 +1,11 @@
+[Icon Theme]
+Name=Ash Icons
+Comment=Curated icon theme for Ash Desktop
+Inherits=Papirus,Adwaita,gnome,hicolor
+Example=folder
+
+[KDE Icon Theme]
+Name=Ash Icons
+Comment=Curated icon theme for Ash Desktop
+Inherits=Papirus,Adwaita,gnome,hicolor
+Example=folder

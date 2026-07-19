@@ -1,0 +1,149 @@
+/*
+ * Ash Plymouth Theme
+ * Catppuccin Mocha palette
+ * Minimalist boot animation
+ */
+
+/* Colors */
+base = "#1e1e2e";
+mauve = "#cba6f7";
+blue = "#89b4fa";
+text = "#cdd6f4";
+subtext = "#a6adc8";
+surface = "#313244";
+overlay = "#6c7086";
+green = "#a6e3a1";
+peach = "#fab387";
+
+/* Background */
+Window.SetBackgroundTopColor(0.12, 0.12, 0.15);   /* #1e1e2e */
+Window.SetBackgroundBottomColor(0.09, 0.09, 0.10); /* #181825 */
+
+/* Logo — ash leaf shape via text */
+fun draw_logo(x, y, scale) {
+    /*
+     * ASCII art ash leaf using text sprites:
+     *   ╱╲
+     *  ╱  ╲
+     *  ╲  ╱
+     *   ╲╱
+     */
+    local sprite = Sprite();
+    sprite.SetPosition(x, y, 100);
+    /* Using bullet/dot and triangle characters */
+    local logo_text = Text("▲");
+    logo_text.SetPosition(x, y, 100);
+    logo_text.SetColor(0.80, 0.65, 0.97); /* #cba6f7 */
+    logo_text.SetFontSize(48 * scale);
+    logo_text.SetAlignment(Plymouth.Script.Bullet);
+    return logo_text;
+}
+
+/* Progress bar background */
+fun draw_progress_bar_bg(x, y, width, height) {
+    local bar_bg = Rectangle();
+    bar_bg.SetPosition(x, y, 50);
+    bar_bg.SetSize(width, height);
+    bar_bg.SetColor(0.12, 0.13, 0.15); /* #1e1e2e */
+    bar_bg.SetBorderRadius(4);
+    return bar_bg;
+}
+
+/* Progress bar fill */
+fun draw_progress_bar_fill(x, y, width, height, progress) {
+    local bar_fill = Rectangle();
+    bar_fill.SetPosition(x, y, 51);
+    bar_fill.SetSize(width * progress, height);
+    bar_fill.SetColor(0.80, 0.65, 0.97); /* #cba6f7 */
+    bar_fill.SetBorderRadius(4);
+    return bar_fill;
+}
+
+/* Boot message */
+fun draw_message(x, y, msg) {
+    local message = Text(msg);
+    message.SetPosition(x, y, 75);
+    message.SetColor(0.68, 0.72, 0.84); /* #a6adc8 */
+    message.SetFontSize(14);
+    message.SetAlignment(Plymouth.Script.Bullet);
+    return message;
+}
+
+/* Bullet for detail messages */
+fun draw_bullet(x, y) {
+    local bullet = Sprite();
+    bullet.SetPosition(x, y, 60);
+    bullet.SetSize(4, 4);
+    bullet.SetColor(0.54, 0.57, 0.69); /* #6c7086 */
+    bullet.SetBorderRadius(2);
+    return bullet;
+}
+
+/* ===== Main ===== */
+width = Window.GetWidth();
+height = Window.GetHeight();
+
+/* Logo at center-top area */
+logo = draw_logo(width / 2 - 20, height / 2 - 60, 1.0);
+
+/* Progress bar */
+bar_width = 240;
+bar_height = 4;
+bar_x = (width - bar_width) / 2;
+bar_y = height / 2 + 20;
+
+bar_bg = draw_progress_bar_bg(bar_x, bar_y, bar_width, bar_height);
+
+/* Boot stage text */
+message = draw_message(width / 2, bar_y + 30, "Starting Ash Desktop...");
+message.SetAlignment(Plymouth.Script.TextAlignment());
+
+/* Detail message (shown during stages) */
+detail = draw_message(width / 2, bar_y + 55, "");
+detail.SetAlignment(Plymouth.Script.TextAlignment());
+detail.SetColor(0.42, 0.44, 0.55); /* #585b70 */
+
+/* ===== Animation loop ===== */
+progress = 0.0;
+pulse_direction = 1;
+pulse_value = 0.5;
+
+while (true) {
+    /* Update progress from Plymouth */
+    progress = Plymouth.GetProgress();
+
+    /* Animate logo pulse */
+    pulse = Math.Sin(pulse_value * 3.14159) * 0.15 + 0.85;
+    logo.SetColor(0.80 * pulse, 0.65 * pulse, 0.97 * pulse);
+    pulse_value = pulse_value + 0.03 * pulse_direction;
+    if (pulse_value > 1.0) pulse_direction = -1;
+    if (pulse_value < 0.0) pulse_direction = 1;
+
+    /* Update progress bar */
+    if (bar_fill != nil) {
+        bar_fill.Delete();
+    }
+    bar_fill = draw_progress_bar_fill(bar_x, bar_y, bar_width, bar_height, progress);
+
+    /* Update boot stage message based on progress */
+    if (progress < 0.1) {
+        msg = "Loading kernel...";
+    } else if (progress < 0.3) {
+        msg = "Starting services...";
+    } else if (progress < 0.5) {
+        msg = "Initializing desktop...";
+    } else if (progress < 0.7) {
+        msg = "Loading Ash environment...";
+    } else if (progress < 0.9) {
+        msg = "Starting AI services...";
+    } else {
+        msg = "Almost ready...";
+    }
+    message.SetText(msg);
+
+    /* Show detail text fade */
+    fade = Math.Clamp(progress * 1.5, 0, 1);
+    detail.SetOpacity(fade);
+
+    Plymouth.WaitForTimeout(0.05);
+}

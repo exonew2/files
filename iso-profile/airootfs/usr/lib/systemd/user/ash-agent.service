@@ -1,0 +1,15 @@
+[Unit]
+Description=Ash AI Agent Daemon
+Documentation=https://ash-iso.dev
+BindsTo=graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ash-desktop/ash-agent-start
+Restart=on-failure
+RestartSec=5
+Environment=XDG_CURRENT_DESKTOP=ash
+
+[Install]
+WantedBy=default.target

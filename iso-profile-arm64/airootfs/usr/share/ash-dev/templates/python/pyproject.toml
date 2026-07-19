@@ -1,0 +1,32 @@
+[project]
+name = "{{project_name}}"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "sqlalchemy>=2.0",
+    "asyncpg",
+    "alembic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx",
+    "ruff>=0.3.0",
+    "pytest-asyncio",
+    "coverage",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

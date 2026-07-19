@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# /usr/lib/ash-agent/ash-agent.talk — Wofi chat interface for Ash Agent
+set -euo pipefail
+
+QUERY=$(wofi --dmenu --prompt "Ask Ash Agent..." --cache-file /dev/null < /dev/null) || true
+[[ -z "${QUERY:-}" ]] && exit 0
+
+export ASH_QUERY="$QUERY"
+RESPONSE=$(python3 << 'PYEOF'
+import dbus, os, sys
+try:
+    bus = dbus.SessionBus()
+    agent = bus.get_object('org.ash.Agent', '/org/ash/Agent')
+    iface = dbus.Interface(agent, 'org.ash.Agent')
+    result = iface.Chat(os.environ['ASH_QUERY'])
+    print(result)
+except dbus.exceptions.DBusException as e:
+    print(f"Ash Agent is not running. Start it with:\n  systemctl --user start ash-agent.service\n\nDBus error: {e}")
+except Exception as e:
+    print(f"Error: {e}")
+PYEOF
+)
+
+if command -v swaync &>/dev/null; then
+    swaync-client --send-notification "Ash Agent" "$RESPONSE" 2>/dev/null || \
+        notify-send -t 10000 "Ash Agent" "$RESPONSE"
+else
+    notify-send -t 10000 "Ash Agent" "$RESPONSE"
+fi

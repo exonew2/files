@@ -1,0 +1,13 @@
+[Unit]
+Description=Collect ISO Debug Logs
+DefaultDependencies=no
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/collect-debug.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

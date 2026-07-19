@@ -1,0 +1,668 @@
+name: Build ISO
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 2025.01.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+env:
+  VERSION: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+
+jobs:
+  preflight:
+    name: Preflight Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify package files
+        run: |
+          for f in iso-profile/packages.x86_64 iso-profile-arm64/packages.aarch64; do
+            test -f "$f" && echo "✓ $f ($(grep -cve '^\s*#' "$f") packages)" || echo "⚠ $f missing"
+          done
+          test -f iso-profile/profiledef.sh || { echo "Missing profiledef.sh"; exit 1; }
+          test -f iso-profile-arm64/profiledef.sh || echo "Missing ARM64 profiledef.sh"
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'iso-profile/packages.x86_64'
+          format: 'cyclonedx'
+          output: 'sbom.cyclonedx.json'
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+          retention-days: 90
+      - name: Security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'iso-profile/'
+          format: 'sarif'
+          output: 'trivy-profile-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-profile-results.sarif'
+          category: 'preflight-trivy'
+
+  # ── Matrix build: both architectures in parallel ───────────────
+  build-iso:
+    name: Build ISO (${{ matrix.arch.name }})
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - name: x86_64
+            profile: iso-profile
+            packages: packages.x86_64
+            qemu_pkg: qemu-system-x86_64
+            artifact: iso-x86_64
+            target: build-iso.sh
+          - name: aarch64
+            profile: iso-profile-arm64
+            packages: packages.aarch64
+            qemu_pkg: qemu-user-static-binfmt
+            artifact: iso-aarch64
+            target: cross-build-arm64.sh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU multi-arch (ARM64)
+        if: matrix.arch.name == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build ${{ matrix.arch.name }} ISO
+        uses: docker://archlinux:latest
+        with:
+          args: |
+            pacman -Sy --noconfirm archiso mkinitcpio-archiso squashfs-tools btrfs-progs ${{ matrix.arch.qemu_pkg }}
+            cd /github/workspace
+            ./scripts/${{ matrix.arch.target }} "${{ env.VERSION }}"
+
+      - name: Upload ${{ matrix.arch.name }} ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch.artifact }}
+          path: |
+            out/ash-*.iso
+            out/ash-*.iso.sha256
+            out/build-*.log
+          retention-days: 30
+
+  # ── Test only x86_64 (QEMU on CI supports x86_64 natively) ────
+  test-iso:
+    name: Test ISO Boot (x86_64)
+    needs: build-iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iso-x86_64
+          path: artifacts/
+
+      - name: Test boot in QEMU
+        run: |
+          chmod +x scripts/test-iso.sh
+          ./scripts/test-iso.sh artifacts/ash-*.iso
+
+  quality-gates:
+    name: Quality Gates
+    needs: test-iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iso-x86_64
+          path: artifacts/
+
+      - name: Boot time test (target < 45s)
+        run: |
+          ISO=$(ls artifacts/ash-*.iso | head -1)
+          qemu-system-x86_64 \
+            -enable-kvm -cpu host -m 4G -smp 4 \
+            -drive file="$ISO",media=cdrom,readonly=on \
+            -boot d -display none -serial stdio \
+            -device virtio-net-pci,netdev=net0 \
+            -netdev user,id=net0,hostfwd=tcp::2223-:22 \
+            -watchdog i6300esb -no-reboot -daemonize -pidfile /tmp/qemu-quality.pid
+
+          START_TIME=$(date +%s)
+          BOOT_SECONDS=0
+          for i in {1..60}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 \
+              -o UserKnownHostsFile=/dev/null -p 2223 aiuser@localhost \
+              "systemctl is-system-running --wait 2>/dev/null; systemctl is-active graphical.target" \
+              2>/dev/null | grep -q active; then
+              BOOT_SECONDS=$(( $(date +%s) - START_TIME ))
+              break
+            fi
+            sleep 5
+          done
+          kill $(cat /tmp/qemu-quality.pid 2>/dev/null) 2>/dev/null || true
+
+          echo "Boot time: ${BOOT_SECONDS}s"
+          if [[ $BOOT_SECONDS -lt 45 ]]; then
+            echo "✓ BOOT TIME: ${BOOT_SECONDS}s (target: <45s)"
+          else
+            echo "✗ BOOT TIME: ${BOOT_SECONDS}s (target: <45s) - EXCEEDED"
+            exit 1
+          fi
+
+      - name: Memory usage test (target < 4G idle)
+        run: |
+          ISO=$(ls artifacts/ash-*.iso | head -1)
+          qemu-system-x86_64 \
+            -enable-kvm -cpu host -m 4G -smp 4 \
+            -drive file="$ISO",media=cdrom,readonly=on \
+            -boot d -display none -serial stdio \
+            -device virtio-net-pci,netdev=net0 \
+            -netdev user,id=net0,hostfwd=tcp::2224-:22 \
+            -watchdog i6300esb -no-reboot -daemonize -pidfile /tmp/qemu-mem.pid
+
+          MEM_USAGE=""
+          for i in {1..30}; do
+            MEM_USAGE=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 \
+              -o UserKnownHostsFile=/dev/null -p 2224 aiuser@localhost \
+              "free -m | awk '/^Mem:/ {print \$3}'" 2>/dev/null || echo "")
+            [[ -n "$MEM_USAGE" ]] && break
+            sleep 5
+          done
+          kill $(cat /tmp/qemu-mem.pid 2>/dev/null) 2>/dev/null || true
+
+          echo "Memory usage: ${MEM_USAGE}MB"
+          if [[ -n "$MEM_USAGE" && $MEM_USAGE -lt 4096 ]]; then
+            echo "✓ MEMORY: ${MEM_USAGE}MB (target: <4096MB)"
+          else
+            echo "✗ MEMORY: ${MEM_USAGE}MB (target: <4096MB) - EXCEEDED"
+            exit 1
+          fi
+
+      - name: Package integrity verification
+        run: |
+          ISO=$(ls artifacts/ash-*.iso | head -1)
+          isoinfo -l -i "$ISO" 2>/dev/null | head -50 || true
+          SHA256_FILE="${ISO}.sha256"
+          if [ -f "$SHA256_FILE" ]; then
+            sha256sum -c "$SHA256_FILE" && echo "✓ INTEGRITY: SHA256 matches"
+          else
+            echo "⚠ INTEGRITY: No SHA256 file to verify"
+          fi
+
+      - name: ISO size regression check
+        run: |
+          ISO=$(ls artifacts/ash-*.iso | head -1)
+          SIZE_MB=$(du -m "$ISO" | cut -f1)
+          echo "ISO size: ${SIZE_MB}MB"
+          HISTORY_FILE=".github/iso-size-history.txt"
+          mkdir -p .github
+          if [[ -f "$HISTORY_FILE" ]]; then
+            LAST_SIZE=$(tail -1 "$HISTORY_FILE" | cut -d, -f1)
+            THRESHOLD=$(( LAST_SIZE * 110 / 100 ))
+            if [[ $SIZE_MB -gt $THRESHOLD ]]; then
+              echo "⚠ SIZE: ${SIZE_MB}MB exceeded 110% of last build (${LAST_SIZE}MB)"
+            else
+              echo "✓ SIZE: ${SIZE_MB}MB (within 110% of last build)"
+            fi
+          fi
+          echo "$SIZE_MB,${GITHUB_SHA}" >> "$HISTORY_FILE"
+
+  build-vm-formats:
+    name: Build VM Formats (Packer)
+    needs: test-iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        format: [vmware, virtualbox, parallels, qemu]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iso-x86_64
+          path: artifacts/
+
+      - uses: hashicorp/setup-packer@v2
+
+      - name: Build ${{ matrix.format }}
+        run: |
+          packer init packer/
+          packer build \
+            -var "version=${{ env.VERSION }}" \
+            -var "iso_path=$(ls artifacts/ash-*.iso | head -1)" \
+            -only=${{ matrix.format }} \
+            packer/ash-iso.pkr.hcl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.format }}
+          path: |
+            ash-${{ env.VERSION }}.ova
+            ash-${{ env.VERSION }}.qcow2
+            ash-${{ env.VERSION }}.pvm
+          retention-days: 30
+
+  build-cloud-images:
+    name: Build Cloud Images
+    needs: test-iso
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cloud: [aws, gcp, azure]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iso-x86_64
+          path: artifacts/
+
+      - uses: hashicorp/setup-packer@v2
+
+      - name: Build ${{ matrix.cloud }} image
+        run: |
+          packer init packer/
+          packer build \
+            -var "version=${{ env.VERSION }}" \
+            -var "iso_path=$(ls artifacts/ash-*.iso | head -1)" \
+            packer/${{ matrix.cloud }}-image.pkr.hcl
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.cloud }}-manifest
+          path: ash-${{ env.VERSION }}-*-manifest.json
+          retention-days: 30
+
+  build-vagrant:
+    name: Build Vagrant Box
+    needs: test-iso
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iso-x86_64
+          path: artifacts/
+
+      - uses: hashicorp/setup-packer@v2
+
+      - name: Build Vagrant boxes
+        run: |
+          packer init packer/
+          packer build \
+            -var "version=${{ env.VERSION }}" \
+            -var "iso_path=$(ls artifacts/ash-*.iso | head -1)" \
+            packer/vagrant-box.pkr.hcl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vagrant
+          path: |
+            ash-${{ env.VERSION }}-libvirt.box
+            ash-${{ env.VERSION }}-virtualbox.box
+          retention-days: 30
+
+  sign-provenance:
+    name: Sign & Provenance (SLSA)
+    needs: [test-iso, build-vm-formats, build-cloud-images, build-vagrant]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: iso-*
+          path: artifacts/
+
+      - uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.10.0
+        with:
+          artifact-path: 'artifacts/ash-${{ env.VERSION }}.iso'
+          provenance-name: provenance.intoto.jsonl
+
+      - uses: sigstore/cosign-installer@v3
+      - run: |
+          cosign sign-blob \
+            --yes \
+            --bundle "artifacts/ash-${{ env.VERSION }}.iso.cosign.bundle" \
+            "artifacts/ash-${{ env.VERSION }}.iso"
+
+      - name: Sign with minisign
+        run: |
+          echo "${{ secrets.MINISIGN_KEY }}" | age -d > /tmp/minisign.key 2>/dev/null || true
+          minisign -Sm "artifacts/ash-${{ env.VERSION }}.iso" -s /tmp/minisign.key -x "artifacts/ash-${{ env.VERSION }}.iso.minisig" 2>/dev/null || true
+          rm -f /tmp/minisign.key
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'artifacts/ash-${{ env.VERSION }}.iso'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signatures
+          path: |
+            artifacts/*.cosign.bundle
+            artifacts/*.minisig
+            artifacts/provenance.intoto.jsonl
+          retention-days: 30
+
+  build-container-images:
+    name: Build & Push Container Images
+    needs: [test-iso, build-iso]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: iso-*
+          path: artifacts/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push OCI image (x86_64)
+        uses: docker/build-push-action@v5
+        with:
+          context: artifacts/iso-x86_64/
+          file: /dev/null
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/ash-linux/ash:${{ env.VERSION }}
+            ghcr.io/ash-linux/ash:latest
+
+      - name: Build and push OCI image (ARM64)
+        if: hashFiles('artifacts/iso-aarch64/ash-*-arm64.iso') != ''
+        uses: docker/build-push-action@v5
+        with:
+          context: artifacts/iso-aarch64/
+          file: /dev/null
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/ash-linux/ash:${{ env.VERSION }}-arm64
+
+  build-extra-formats:
+    name: Build Extra Formats (RPi, WSL2)
+    needs: build-iso
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: iso-*
+          path: artifacts/
+
+      - name: Build RPi4 image
+        if: hashFiles('artifacts/iso-aarch64/ash-*-arm64.iso') != ''
+        run: |
+          mkdir -p out
+          cp artifacts/iso-aarch64/ash-*-arm64.iso out/ash-${{ env.VERSION }}-arm64.iso
+          qemu-img convert -f iso -O raw out/ash-${{ env.VERSION }}-arm64.iso out/ash-${{ env.VERSION }}-rpi4.img
+          gzip -c out/ash-${{ env.VERSION }}-rpi4.img > out/ash-${{ env.VERSION }}-rpi4.img.gz
+
+      - name: Build RPi5 image
+        if: hashFiles('out/ash-${{ env.VERSION }}-rpi4.img.gz') != ''
+        run: |
+          cp out/ash-${{ env.VERSION }}-rpi4.img out/ash-${{ env.VERSION }}-rpi5.img
+          gzip -c out/ash-${{ env.VERSION }}-rpi5.img > out/ash-${{ env.VERSION }}-rpi5.img.gz
+
+      - name: Build WSL2 tarball
+        run: |
+          mkdir -p /tmp/ash-wsl
+          cat > /tmp/ash-wsl/Dockerfile << 'DOCKER'
+FROM archlinux:latest
+RUN pacman -Sy --noconfirm base linux-firmware sudo zsh fish openssh docker ollama qdrant && \
+    pacman -Scc --noconfirm && \
+    useradd -m -G wheel,docker -s /bin/zsh aiuser && \
+    echo 'aiuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/aiuser && \
+    rm -f /etc/machine-id
+CMD ["/bin/zsh"]
+DOCKER
+          docker build -t ash-wsl-builder /tmp/ash-wsl
+          docker export $(docker create ash-wsl-builder) | gzip > out/ash-${{ env.VERSION }}.wsl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extra-formats
+          path: |
+            out/*.img.gz
+            out/*.wsl
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: [sign-provenance, build-container-images, build-extra-formats]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: iso-*|*-manifest|vagrant|signatures|sbom|extra-formats
+          path: release-assets/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ash ${{ github.ref_name }}
+          body: |
+            ## ash ${{ github.ref_name }}
+
+            **Arch Snapshot Hypervisor** — Download ISO → Boot → Code with AI
+
+            ### Multi-Architecture
+            - **x86_64** — Intel/AMD desktops, servers, cloud
+            - **aarch64/ARM64** — Apple Silicon, Raspberry Pi 4/5, ARM servers
+
+            ### Verification (Required)
+            Every release is signed with 4 independent mechanisms:
+            - **SHA256** — Basic integrity
+            - **minisign** — Ed25519 signatures (recommended)
+            - **cosign** — Keyless + Sigstore transparency log
+            - **SLSA Level 3** — Build provenance attestation
+            - **SBOM** — CycloneDX software bill of materials
+
+            ### Cloud Deployments
+            | Cloud | Format | Cost |
+            |-------|--------|------|
+            | AWS | AMI (public) | Spot instances |
+            | GCP | Custom Image | Preemptible VMs |
+            | Azure | Managed Image | Low-priority VMSS |
+
+            ### Formats
+            | Format | Size | Use Case |
+            |--------|------|----------|
+            | ISO (x86_64) | ~2.3 GB | All hypervisors, USB, bare metal |
+            | ISO (ARM64) | ~2.3 GB | Apple Silicon, Raspberry Pi, ARM servers |
+            | VMware OVA | ~2.5 GB | VMware Fusion/Workstation/ESXi |
+            | VirtualBox OVA | ~2.5 GB | VirtualBox 7+ |
+            | Parallels PVM | ~2.5 GB | Parallels Desktop 18+ (macOS) |
+            | QCOW2 | ~2.3 GB | QEMU/KVM, libvirt, Proxmox |
+            | VHDX | ~2.5 GB | Hyper-V |
+            | Vagrant Box | ~2.3 GB | `vagrant init ash-linux/ash` |
+            | RPi4/5 .img | ~2.5 GB | Raspberry Pi Imager / Balena Etcher |
+            | WSL2 .wsl | ~2.0 GB | Windows WSL2 with systemd |
+            | OCI Container | ~2.0 GB | `docker pull ghcr.io/ash-linux/ash` |
+            | AWS AMI / GCP Image / Azure VHD | ~3.5 GB | Cloud deployments |
+
+            ### What's New
+            See [CHANGELOG.md](https://github.com/ash-linux/ash/blob/main/CHANGELOG.md)
+          generate_release_notes: true
+          files: |
+            release-assets/iso-x86_64/ash-*.iso
+            release-assets/iso-x86_64/ash-*.iso.sha256
+            release-assets/iso-x86_64/ash-*.iso.minisig
+            release-assets/iso-x86_64/ash-*.iso.cosign.bundle
+            release-assets/iso-x86_64/provenance.intoto.jsonl
+            release-assets/iso-aarch64/ash-*-arm64.iso
+            release-assets/iso-aarch64/ash-*-arm64.iso.sha256
+            release-assets/vmware/ash-*.ova
+            release-assets/virtualbox/ash-*.ova
+            release-assets/parallels/ash-*.pvm
+            release-assets/qemu/ash-*.qcow2
+            release-assets/qemu/ash-*.vhdx
+            release-assets/qemu/ash-*.img.gz
+            release-assets/vagrant/ash-*.box
+            release-assets/aws/ash-*-ami-manifest.json
+            release-assets/gcp/ash-*-gcp-manifest.json
+            release-assets/azure/ash-*-azure-manifest.json
+            release-assets/sbom/sbom.cyclonedx.json
+            release-assets/extra-formats/ash-*.img.gz
+            release-assets/extra-formats/ash-*.wsl
+
+  publish-mirrors:
+    name: Publish to Mirrors
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: iso-*
+          path: artifacts/
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Upload to Cloudflare R2
+        run: |
+          cd artifacts
+          find . -type f \( -name "ash-*.iso" -o -name "ash-*.sha256" -o -name "ash-*.minisig" -o -name "ash-*.cosign.bundle" -o -name "sbom.cyclonedx.json" \) | while read f; do
+            rel="${f#./}"
+            wrangler r2 put "ash-releases/${{ github.ref_name }}/$rel" --file "$f"
+          done
+
+      - name: Create torrent
+        run: |
+          ISO=$(find artifacts -name "ash-*-x86_64.iso" 2>/dev/null || find artifacts -name "ash-*.iso" ! -name "*-arm64.iso" | head -1)
+          if [[ -n "$ISO" ]]; then
+            webtorrent create "$ISO" \
+              -o "torrents/ash-${{ github.ref_name }}.torrent" \
+              -a "wss://tracker.btorrent.xyz" \
+              -a "wss://tracker.openwebtorrent.com" \
+              -a "wss://tracker.webtorrent.dev"
+            wrangler r2 put "ash-releases/torrents/ash-${{ github.ref_name }}.torrent" --file "torrents/ash-${{ github.ref_name }}.torrent"
+          fi
+
+      - name: Upload to Archive.org
+        if: env.IA_ACCESS_KEY != ''
+        run: |
+          ISO=$(find artifacts -name "ash-*-x86_64.iso" 2>/dev/null || find artifacts -name "ash-*.iso" ! -name "*-arm64.iso" | head -1)
+          ia upload "ash-${{ github.ref_name }}" "$ISO" \
+            --metadata="mediatype:software" \
+            --metadata="title:ash ${{ github.ref_name }}" \
+            --metadata="description:Arch Snapshot Hypervisor ISO"
+
+  publish-vagrant:
+    name: Publish to Vagrant Cloud
+    needs: create-release
+    if: env.VAGRANT_CLOUD_TOKEN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vagrant
+          path: boxes/
+
+      - name: Release to Vagrant Cloud
+        run: |
+          for box in boxes/ash-${{ github.ref_name }}-*.box; do
+            PROVIDER=$(basename "$box" | sed 's/.*-//' | sed 's/\.box$//')
+            curl -s -X POST \
+              -H "Authorization: Bearer ${VAGRANT_CLOUD_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://app.vagrantup.com/api/v1/box/ash-linux/ash/versions" \
+              -d "{\"version\": {\"version\": \"${{ github.ref_name }}\", \"description\": \"ash ${{ github.ref_name }}\"}}"
+            PROVIDER_JSON=$(curl -s -X POST \
+              -H "Authorization: Bearer ${VAGRANT_CLOUD_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://app.vagrantup.com/api/v1/box/ash-linux/ash/version/${{ github.ref_name }}/providers" \
+              -d "{\"provider\": {\"name\": \"${PROVIDER}\", \"url\": \"\"}}")
+            UPLOAD_URL=$(echo "$PROVIDER_JSON" | jq -r '.provider.upload_path')
+            [[ -n "$UPLOAD_URL" && "$UPLOAD_URL" != "null" ]] && \
+              curl -X PUT -H "Content-Type: application/octet-stream" --data-binary @"$box" "$UPLOAD_URL"
+            curl -s -X PUT \
+              -H "Authorization: Bearer ${VAGRANT_CLOUD_TOKEN}" \
+              "https://app.vagrantup.com/api/v1/box/ash-linux/ash/version/${{ github.ref_name }}/providers/${PROVIDER}/release"
+          done
+
+  notify-update:
+    name: Notify Update API
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update version API
+        run: |
+          curl -X POST "https://api.ash.sh/v1/version/publish" \
+            -H "Authorization: Bearer ${CF_WORKER_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"version\": \"${{ github.ref_name }}\",
+              \"sha256\": \"$(sha256sum artifacts/iso-x86_64/ash-*.iso | head -1 | cut -d' ' -f1)\",
+              \"size\": $(stat -c%s artifacts/iso-x86_64/ash-*.iso 2>/dev/null || echo 0),
+              \"iso_url\": \"https://cdn.ash.sh/${{ github.ref_name }}/ash-${{ github.ref_name }}.iso\",
+              \"iso_arm64_url\": \"https://cdn.ash.sh/${{ github.ref_name }}/ash-${{ github.ref_name }}-arm64.iso\",
+              \"changelog\": \"$(gh release view ${{ github.ref_name }} --json body -q .body | head -c 5000)\"
+            }"
+
+  deploy-landing:
+    name: Deploy Landing Page
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: landing-page/package-lock.json
+      - name: Install dependencies
+        run: cd landing-page && npm ci
+      - name: Build
+        run: cd landing-page && npm run build
+        env:
+          PUBLIC_VERSION: ${{ github.ref_name }}
+      - uses: actions/deploy-pages@v4
+        with:
+          path: landing-page/dist

@@ -1,0 +1,358 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" width="800" height="1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAFAFA"/>
+      <stop offset="100%" stop-color="#E2E5E8"/>
+    </linearGradient>
+    <linearGradient id="topbarBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F6F7F9"/>
+    </linearGradient>
+    <linearGradient id="termTitle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3D3D3D"/>
+      <stop offset="100%" stop-color="#2D2D2D"/>
+    </linearGradient>
+    <linearGradient id="browserTitle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F0F0F0"/>
+    </linearGradient>
+    <linearGradient id="vscTitle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3C3C3C"/>
+      <stop offset="100%" stop-color="#323232"/>
+    </linearGradient>
+    <linearGradient id="cardGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="rgba(13,148,136,0.12)"/>
+      <stop offset="100%" stop-color="rgba(13,148,136,0.02)"/>
+    </linearGradient>
+    <linearGradient id="termProgress" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4AF626"/>
+      <stop offset="100%" stop-color="#2EA043"/>
+    </linearGradient>
+    <filter id="shadow" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+    <filter id="topShadow" x="0%" y="0%" width="100%" height="200%">
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="1200" fill="url(#bg)"/>
+
+  <!-- ===== TOP BAR ===== -->
+  <rect width="800" height="26" fill="url(#topbarBg)" filter="url(#topShadow)"/>
+  <rect width="800" height="1" y="25" fill="#E4E5E7"/>
+
+  <rect x="6" y="4" width="64" height="18" rx="4" fill="#F0F1F3"/>
+  <text x="16" y="16" fill="#333" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Activities</text>
+
+  <text x="400" y="16" fill="#1A1A1A" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600" text-anchor="middle">Sat Jul 18  3:41 PM</text>
+
+  <!-- System tray -->
+  <g transform="translate(730, 8)">
+    <path d="M0 5 Q5 0 10 5" fill="none" stroke="#555" stroke-width="1.2" stroke-linecap="round"/>
+    <circle cx="5" cy="9" r="1.2" fill="#555"/>
+  </g>
+  <g transform="translate(752, 8)">
+    <rect x="0" y="0" width="12" height="8" rx="1.5" fill="none" stroke="#555" stroke-width="1"/>
+    <rect x="1" y="1" width="10" height="5" rx="0.8" fill="#555"/>
+    <rect x="1" y="1" width="7" height="5" rx="0.8" fill="#0D9488"/>
+    <rect x="12" y="2" width="1.5" height="4" rx="0.8" fill="#555"/>
+  </g>
+
+  <!-- ===== TERMINAL WINDOW (top) ===== -->
+  <g filter="url(#shadow)" transform="translate(18, 34)">
+    <rect width="764" height="340" rx="6" fill="#1E1E1E"/>
+    <rect width="764" height="30" rx="6" fill="url(#termTitle)"/>
+    <rect x="0" y="30" width="764" height="1" fill="rgba(255,255,255,0.06)"/>
+    <rect x="0" y="30" width="764" height="310" fill="#121212"/>
+
+    <circle cx="14" cy="15" r="4" fill="#FF5F57"/>
+    <circle cx="28" cy="15" r="4" fill="#FFBD2E"/>
+    <circle cx="42" cy="15" r="4" fill="#28C840"/>
+    <text x="382" y="19" fill="#AAA" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">aiuser@ash: ~</text>
+
+    <!-- Terminal content -->
+    <g transform="translate(12, 44)" font-family="'JetBrains Mono', 'Fira Code', monospace" font-size="10">
+      <text x="0" y="0" fill="#0D9488">aiuser@ash:~$</text>
+      <text x="76" y="0" fill="#CCC">ollama run llama3.1</text>
+
+      <text x="0" y="18" fill="#569CD6">pulling manifest</text>
+      <text x="0" y="34" fill="#569CD6">pulling 8a0d2f7c... 100%</text>
+      <rect x="160" y="27" width="90" height="6" rx="3" fill="rgba(255,255,255,0.06)"/>
+      <rect x="160" y="27" width="90" height="6" rx="3" fill="url(#termProgress)"/>
+      <text x="256" y="34" fill="#4AF626">✓</text>
+
+      <text x="0" y="50" fill="#569CD6">pulling 6b4b1e4c... 100%</text>
+      <rect x="160" y="43" width="90" height="6" rx="3" fill="rgba(255,255,255,0.06)"/>
+      <rect x="160" y="43" width="90" height="6" rx="3" fill="url(#termProgress)"/>
+      <text x="256" y="50" fill="#4AF626">✓</text>
+
+      <text x="0" y="66" fill="#569CD6">verifying sha256 digest</text>
+      <text x="0" y="82" fill="#569CD6">writing manifest</text>
+      <text x="0" y="100" fill="#4AF626">success</text>
+
+      <text x="0" y="126" fill="#888">>>> </text>
+      <text x="28" y="126" fill="#CCC">Write a Python function to</text>
+      <text x="28" y="142" fill="#CCC">find similar vectors in Qdrant</text>
+
+      <text x="0" y="166" fill="#4AF626">def find_similar(</text>
+      <text x="4" y="182" fill="#4AF626">    client: QdrantClient,</text>
+      <text x="4" y="198" fill="#4AF626">    collection: str,</text>
+      <text x="4" y="214" fill="#4AF626">    vector: list[float],</text>
+      <text x="4" y="230" fill="#4AF626">    limit: int = 10</text>
+      <text x="0" y="246" fill="#4AF626">) -> list[ScoredPoint]:</text>
+      <text x="4" y="262" fill="#4AF626">    return client.search(</text>
+      <text x="8" y="278" fill="#4AF626">        collection_name=collection,</text>
+      <text x="8" y="294" fill="#4AF626">        query_vector=vector,</text>
+      <text x="8" y="310" fill="#4AF626">        limit=limit</text>
+      <text x="4" y="326" fill="#4AF626">    )</text>
+    </g>
+
+    <rect x="748" y="30" width="5" height="310" rx="2.5" fill="transparent"/>
+    <rect x="748" y="30" width="5" height="35" rx="2.5" fill="rgba(255,255,255,0.08)"/>
+  </g>
+
+  <!-- ===== BROWSER WINDOW (middle) ===== -->
+  <g filter="url(#shadow)" transform="translate(18, 390)">
+    <rect width="764" height="380" rx="6" fill="#FFFFFF"/>
+    <rect width="764" height="34" rx="6" fill="url(#browserTitle)"/>
+    <rect x="0" y="34" width="764" height="1" fill="#D4D4D4"/>
+
+    <circle cx="14" cy="17" r="4.5" fill="#FF5F57"/>
+    <circle cx="28" cy="17" r="4.5" fill="#FFBD2E"/>
+    <circle cx="42" cy="17" r="4.5" fill="#28C840"/>
+
+    <!-- URL Bar -->
+    <rect x="80" y="9" width="600" height="18" rx="9" fill="#E8E9EB"/>
+    <rect x="96" y="15" width="6" height="7" rx="1.2" fill="none" stroke="#0D9488" stroke-width="1"/>
+    <path d="M98 21 L98 23 L102 23" fill="none" stroke="#0D9488" stroke-width="0.8" stroke-linecap="round"/>
+    <text x="110" y="21" fill="#333" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500">localhost:6333</text>
+    <text x="204" y="21" fill="#999" font-family="system-ui, -apple-system, sans-serif" font-size="9">/dashboard</text>
+
+    <rect x="0" y="34" width="764" height="2.5" fill="#0D9488"/>
+
+    <!-- Page Content -->
+    <rect x="0" y="36.5" width="764" height="343.5" fill="#0F172A"/>
+
+    <!-- Dashboard Sidebar -->
+    <rect x="0" y="36.5" width="160" height="343.5" fill="#1E293B"/>
+    <text x="14" y="66" fill="#0D9488" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="700">Qdrant</text>
+    <text x="78" y="66" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8">v1.13</text>
+
+    <g transform="translate(12, 82)" font-family="system-ui, -apple-system, sans-serif" font-size="11">
+      <rect x="-6" y="0" width="148" height="24" rx="4" fill="rgba(13,148,136,0.15)"/>
+      <text x="4" y="16" fill="#0D9488" font-weight="500">Dashboard</text>
+      <text x="4" y="42" fill="#94A3B8">Collections</text>
+      <text x="4" y="64" fill="#94A3B8">Search</text>
+      <text x="4" y="86" fill="#94A3B8">Snapshots</text>
+    </g>
+
+    <!-- Sidebar online badge -->
+    <g transform="translate(12, 328)">
+      <rect x="0" y="0" width="136" height="20" rx="3" fill="rgba(74,246,38,0.08)"/>
+      <circle cx="12" cy="10" r="3" fill="#4AF626"/>
+      <text x="20" y="13" fill="#4AF626" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">Online</text>
+    </g>
+
+    <!-- Main Content -->
+    <g transform="translate(176, 52)">
+      <text x="0" y="0" fill="#F1F5F9" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600">Dashboard</text>
+      <text x="0" y="18" fill="#64748B" font-family="system-ui, -apple-system, sans-serif" font-size="9">Vector database overview</text>
+
+      <!-- Cards -->
+      <g transform="translate(0, 32)">
+        <rect x="0" y="0" width="130" height="56" rx="6" fill="#1E293B" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+        <rect x="0" y="0" width="130" height="56" rx="6" fill="url(#cardGlow)"/>
+        <text x="10" y="18" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Collections</text>
+        <text x="10" y="44" fill="#F1F5F9" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700">3</text>
+
+        <rect x="138" y="0" width="130" height="56" rx="6" fill="#1E293B" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+        <text x="148" y="18" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Vectors</text>
+        <text x="148" y="44" fill="#F1F5F9" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700">12.4K</text>
+
+        <rect x="276" y="0" width="130" height="56" rx="6" fill="#1E293B" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+        <text x="286" y="18" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Storage</text>
+        <text x="286" y="44" fill="#F1F5F9" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700">89 MB</text>
+
+        <rect x="414" y="0" width="130" height="56" rx="6" fill="#1E293B" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+        <text x="424" y="18" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Status</text>
+        <circle cx="440" cy="36" r="6" fill="#4AF626" opacity="0.2"/>
+        <circle cx="440" cy="36" r="3.5" fill="#4AF626"/>
+        <text x="452" y="40" fill="#4AF626" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Online</text>
+      </g>
+
+      <!-- Collections Table -->
+      <g transform="translate(0, 106)">
+        <text x="0" y="0" fill="#F1F5F9" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Collections</text>
+
+        <g transform="translate(0, 14)">
+          <rect x="0" y="0" width="570" height="24" rx="4" fill="#1E293B"/>
+          <text x="12" y="16" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">NAME</text>
+          <text x="110" y="16" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">VECTORS</text>
+          <text x="220" y="16" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">DIM</text>
+          <text x="300" y="16" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">DISTANCE</text>
+          <text x="400" y="16" fill="#94A3B8" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600">STATE</text>
+
+          <rect x="0" y="28" width="570" height="28" rx="4" fill="rgba(255,255,255,0.02)"/>
+          <circle cx="16" cy="42" r="5" fill="#0D9488" opacity="0.3"/>
+          <text x="12" y="46" fill="#E2E8F0" font-family="system-ui, -apple-system, sans-serif" font-size="9">documents</text>
+          <text x="110" y="46" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">8,256</text>
+          <text x="220" y="46" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">768</text>
+          <text x="300" y="46" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">Cosine</text>
+          <circle cx="410" cy="42" r="3" fill="#4AF626"/>
+
+          <rect x="0" y="60" width="570" height="28" rx="4" fill="rgba(255,255,255,0.02)"/>
+          <circle cx="16" cy="74" r="5" fill="#6366F1" opacity="0.3"/>
+          <text x="12" y="78" fill="#E2E8F0" font-family="system-ui, -apple-system, sans-serif" font-size="9">embeddings</text>
+          <text x="110" y="78" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">3,512</text>
+          <text x="220" y="78" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">1536</text>
+          <text x="300" y="78" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">Dot</text>
+          <circle cx="410" cy="74" r="3" fill="#4AF626"/>
+
+          <rect x="0" y="92" width="570" height="28" rx="4" fill="rgba(255,255,255,0.02)"/>
+          <circle cx="16" cy="106" r="5" fill="#F59E0B" opacity="0.3"/>
+          <text x="12" y="110" fill="#E2E8F0" font-family="system-ui, -apple-system, sans-serif" font-size="9">images</text>
+          <text x="110" y="110" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">672</text>
+          <text x="220" y="110" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">512</text>
+          <text x="300" y="110" fill="#CBD5E1" font-family="system-ui, -apple-system, sans-serif" font-size="9">Euclid</text>
+          <circle cx="410" cy="106" r="3" fill="#FBBF24"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- ===== VS CODE WINDOW (bottom) ===== -->
+  <g filter="url(#shadow)" transform="translate(18, 786)">
+    <rect width="764" height="390" rx="6" fill="#1E1E1E"/>
+    <rect width="764" height="28" rx="6" fill="url(#vscTitle)"/>
+    <rect x="0" y="28" width="764" height="1" fill="rgba(255,255,255,0.08)"/>
+
+    <circle cx="13" cy="14" r="4" fill="#FF5F57"/>
+    <circle cx="26" cy="14" r="4" fill="#FFBD2E"/>
+    <circle cx="39" cy="14" r="4" fill="#28C840"/>
+    <text x="382" y="18" fill="#BBB" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">vector_search.py</text>
+
+    <!-- Tabs -->
+    <g transform="translate(36, 28)">
+      <rect x="0" y="0" width="110" height="28" fill="#2D2D2D"/>
+      <rect x="1" y="28" width="108" height="1" fill="#1E1E1E"/>
+      <path d="M8 20 L8 12 L14 16 L8 20Z" fill="#0D9488" opacity="0.7"/>
+      <text x="18" y="19" fill="#CCC" font-family="system-ui, -apple-system, sans-serif" font-size="9">vector_search.py</text>
+
+      <rect x="110" y="0" width="80" height="28" fill="#1E1E1E"/>
+      <text x="122" y="19" fill="#666" font-family="system-ui, -apple-system, sans-serif" font-size="9">config.yaml</text>
+    </g>
+
+    <!-- Activity Bar -->
+    <rect x="0" y="56" width="36" height="334" fill="#333333"/>
+    <rect x="0" y="56" width="2" height="36" fill="#0D9488"/>
+    <rect x="9" y="67" width="18" height="14" rx="1.5" fill="none" stroke="#CCC" stroke-width="1.2"/>
+    <path d="M12 70 L16 73 L12 76" fill="none" stroke="#CCC" stroke-width="1"/>
+
+    <circle cx="18" cy="108" r="6" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+    <rect x="22" y="112" width="4" height="4" rx="0.8" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.2" transform="rotate(45 22 112)"/>
+
+    <!-- Sidebar -->
+    <rect x="36" y="56" width="140" height="334" fill="#252526"/>
+    <text x="44" y="76" fill="#BBB" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600" letter-spacing="0.5">EXPLORER</text>
+
+    <g transform="translate(44, 88)" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#999">
+      <path d="M0 0 L5 5 L0 10" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+      <rect x="8" y="1" width="10" height="8" rx="0.8" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+      <text x="20" y="9" fill="#CCC">ash-vector</text>
+
+      <g transform="translate(12, 16)">
+        <path d="M0 4 L5 9 L0 14" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+        <circle cx="12" cy="9" r="4" fill="rgba(255,255,255,0.15)"/>
+        <text x="18" y="12" fill="#CCC">src</text>
+
+        <g transform="translate(20, 20)">
+          <text x="0" y="0" fill="#CCC">main.py</text>
+          <rect x="-6" y="14" width="110" height="18" rx="2" fill="#37373D"/>
+          <text x="0" y="26" fill="#FFF">vector_search.py</text>
+          <text x="0" y="42" fill="#999">utils</text>
+          <text x="0" y="58" fill="#999">config.yaml</text>
+          <text x="0" y="74" fill="#999">Dockerfile</text>
+          <text x="0" y="90" fill="#999">README.md</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Editor area -->
+    <g transform="translate(176, 80)" font-family="'JetBrains Mono', 'Fira Code', monospace" font-size="9">
+      <g fill="#484848">
+        <text x="0" y="10" text-anchor="end">1</text>
+        <text x="0" y="22" text-anchor="end">2</text>
+        <text x="0" y="34" text-anchor="end">3</text>
+        <text x="0" y="46" text-anchor="end">4</text>
+        <text x="0" y="58" text-anchor="end">5</text>
+        <text x="0" y="70" text-anchor="end">6</text>
+        <text x="0" y="82" text-anchor="end">7</text>
+      </g>
+      <rect x="20" y="0" width="540" height="12" fill="#2D2D2D" opacity="0.5"/>
+
+      <g transform="translate(24, 0)">
+        <text x="0" y="10" fill="#569CD6">import</text>
+        <text x="36" y="10" fill="#9CDCFE">os</text>
+
+        <text x="0" y="22" fill="#569CD6">from</text>
+        <text x="28" y="22" fill="#9CDCFE">qdrant_client</text>
+        <text x="108" y="22" fill="#569CD6">import</text>
+        <text x="136" y="22" fill="#9CDCFE">QdrantClient</text>
+
+        <text x="0" y="34" fill="#569CD6">from</text>
+        <text x="28" y="34" fill="#9CDCFE">qdrant_client.http.models</text>
+        <text x="204" y="34" fill="#569CD6">import</text>
+        <text x="232" y="34" fill="#9CDCFE">VectorParams, Distance</text>
+
+        <text x="0" y="58" fill="#6A9955"># Initialize Qdrant client</text>
+
+        <text x="0" y="70" fill="#569CD6">def</text>
+        <text x="24" y="70" fill="#DCDCAA">setup_collection</text>
+        <text x="116" y="70" fill="#D4D4D4">():</text>
+
+        <text x="16" y="82" fill="#9CDCFE">client</text>
+        <text x="52" y="82" fill="#D4D4D4">=</text>
+        <text x="60" y="82" fill="#9CDCFE">QdrantClient</text>
+        <text x="128" y="82" fill="#D4D4D4">(</text>
+        <text x="136" y="82" fill="#CE9178">"localhost"</text>
+        <text x="200" y="82" fill="#D4D4D4">,</text>
+        <text x="208" y="82" fill="#DCDCAA">port</text>
+        <text x="232" y="82" fill="#D4D4D4">=</text>
+        <text x="240" y="82" fill="#B5CEA8">6333</text>
+        <text x="260" y="82" fill="#D4D4D4">)</text>
+      </g>
+    </g>
+
+    <!-- Integrated Terminal (bottom) -->
+    <g transform="translate(36, 260)">
+      <rect x="0" y="0" width="728" height="20" fill="#252526"/>
+      <rect x="0" y="0" width="60" height="20" fill="#1E1E1E"/>
+      <rect x="0" y="20" width="60" height="2" fill="#0D9488"/>
+      <text x="8" y="13" fill="#FFF" font-family="system-ui, -apple-system, sans-serif" font-size="8">TERMINAL</text>
+
+      <rect x="0" y="22" width="728" height="110" fill="rgba(30,30,30,0.92)"/>
+
+      <g transform="translate(8, 32)" font-family="'JetBrains Mono', 'Fira Code', monospace" font-size="9" opacity="0.85">
+        <text x="0" y="0" fill="#0D9488">aiuser@ash</text>
+        <text x="52" y="0" fill="#888">:</text>
+        <text x="58" y="0" fill="#4AF626">~</text>
+        <text x="68" y="0" fill="#888">$</text>
+        <text x="76" y="0" fill="#CCC">python vector_search.py</text>
+        <text x="0" y="16" fill="#888">Connecting to Qdrant...</text>
+        <text x="0" y="32" fill="#4AF626">✓ Connected</text>
+        <text x="0" y="48" fill="#888">Creating collection...</text>
+        <text x="0" y="64" fill="#4AF626">✓ Collection ready</text>
+        <text x="0" y="80" fill="#4AF626">✓ Found 10 results (12ms)</text>
+      </g>
+    </g>
+
+    <!-- Status bar -->
+    <rect x="36" y="374" width="728" height="16" fill="#0D9488"/>
+    <text x="44" y="385" fill="#FFF" font-family="system-ui, -apple-system, sans-serif" font-size="8">main</text>
+    <text x="74" y="385" fill="rgba(255,255,255,0.75)" font-family="system-ui, -apple-system, sans-serif" font-size="8">Ln 7, Col 4</text>
+    <text x="130" y="385" fill="rgba(255,255,255,0.75)" font-family="system-ui, -apple-system, sans-serif" font-size="8">Python 3.12</text>
+    <circle cx="728" cy="382" r="2.5" fill="#4AF626"/>
+  </g>
+</svg>

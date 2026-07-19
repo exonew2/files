@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG_DIR="$HOME/.config/ash"
+FLAG_FILE="$CONFIG_DIR/.onboarding-complete"
+mkdir -p "$CONFIG_DIR"
+
+[ -f "$FLAG_FILE" ] && exit 0
+
+WOFI_CMD="wofi --dmenu --prompt"
+ROFI_CMD="rofi -dmenu -p"
+
+if command -v wofi &>/dev/null; then
+    MENU="$WOFI_CMD"
+elif command -v rofi &>/dev/null; then
+    MENU="$ROFI_CMD"
+else
+    exit 0
+fi
+
+show_page() {
+    local title="$1"
+    local body="$2"
+    shift 2
+    local choices=("$@")
+    local choice
+    choice=$(printf "%s\n" "${choices[@]}" | $MENU "$title" -p "Ash Onboarding" -i -lines 5 -width 80 -location 0 < /dev/null)
+    echo "$choice"
+}
+
+# Page 1: Welcome
+choice=$(show_page "Welcome to Ash" \
+"Welcome to Ash — your AI-native development environment.\n\nAsh combines the power of Arch Linux with an AI-aware desktop for modern development.\n\nLet's take a quick tour!" \
+ "Next: Desktop Overview" "Skip Tour")
+
+[ "$choice" != "Skip Tour" ] || { touch "$FLAG_FILE"; exit 0; }
+
+# Page 2: Desktop Overview
+choice=$(show_page "Desktop Overview" \
+"The Ash Desktop features:\n\n• Hyprland — fluid, dynamic tiling Wayland compositor\n• Waybar — AI-aware status bar\n• SwayNC — smart notification center\n• Multiple workspaces (Super+1-9)\n• Smooth gestures for workspace switching" \
+ "Next: AI Features" "Skip Tour")
+
+[ "$choice" != "Skip Tour" ] || { touch "$FLAG_FILE"; exit 0; }
+
+# Page 3: AI Features
+choice=$(show_page "AI Features" \
+"Ash is AI-native:\n\n• Super+Space — AI Command Palette (semantic search via LSFS)\n• Ollama — local LLM runtime (pull models with ai-model-selector)\n• Qdrant — vector database for semantic memory\n• LSFS — LLM Semantic File System (semantic file operations)\n• AI status in Waybar shows model/vector health" \
+ "Next: Development Tools" "Skip Tour")
+
+[ "$choice" != "Skip Tour" ] || { touch "$FLAG_FILE"; exit 0; }
+
+# Page 4: Development Tools
+choice=$(show_page "Development Tools" \
+"Pre-installed dev tools:\n\n• Kitty terminal with JetBrains Mono Nerd Font\n• Neovim + VSCodium for editing\n• Docker/Podman for containers\n• Python, Go, Rust, Node.js runtimes\n• QEMU/Virt-Manager for VMs\n• Git, jq, ripgrep, fd, bat, and more" \
+ "Next: Community & Support" "Skip Tour")
+
+[ "$choice" != "Skip Tour" ] || { touch "$FLAG_FILE"; exit 0; }
+
+# Page 5: Community
+choice=$(show_page "Community & Support" \
+"Welcome to the Ash community!\n\n• Report issues: iso-report-issue\n• Debug info: iso-debug-issue\n• Check for updates: Ash Menu in Waybar\n\nHappy building!" \
+ "Finish Tour" "Remind Me Later")
+
+if [ "$choice" = "Finish Tour" ]; then
+    touch "$FLAG_FILE"
+fi

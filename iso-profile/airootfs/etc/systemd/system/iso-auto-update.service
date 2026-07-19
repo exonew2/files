@@ -1,0 +1,10 @@
+[Unit]
+Description=Auto System Update with Snapshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/auto-update.sh
+StandardOutput=journal
+StandardError=journal

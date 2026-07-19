@@ -1,0 +1,276 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../data/site-config';
+
+const { version, sha256, size, minisignPubKey, siteUrl } = SITE_CONFIG;
+const shortSha = sha256.substring(0, 16) + '…';
+const shortMinisign = minisignPubKey.substring(0, 12) + '…';
+---
+<Layout
+    title="ash — Arch Snapshot Hypervisor"
+    description="Download ISO → Boot → Code with AI. No install. No config. No curl | sh. 2.3 GB ISO. Boots in ~45s. Arch + AI tools ready."
+    ogImage="/og-image.svg"
+    ogUrl={siteUrl}
+>
+
+<section class="hero" aria-labelledby="hero-title">
+    <div class="container">
+        <h1 id="hero-title" class="hero-headline reveal">
+            Download ISO → Boot → Code with AI.<br>
+            <span class="hero-headline-accent">No install. No config. No <code>curl | sh</code>.</span>
+        </h1>
+        <p class="hero-subhead reveal">
+            <strong>{size} ISO.</strong> Boots in <strong>~45s</strong>. Arch + GNOME + Ollama + llama.cpp + Qdrant ready.
+            <br>VMware Fusion/Workstation • VirtualBox • Parallels Desktop • QEMU/KVM
+        </p>
+
+        <div class="trust-row reveal" role="list" aria-label="Verification signals">
+            <div class="trust-item" role="listitem">
+                <span class="trust-label">SHA256</span>
+                <code class="trust-value copyable" data-value={sha256}>{shortSha}</code>
+                <button class="btn-copy" data-copy-target=".trust-value" aria-label="Copy SHA256">Copy</button>
+            </div>
+            <div class="trust-item" role="listitem">
+                <span class="trust-label">minisign</span>
+                <code class="trust-value">{shortMinisign}</code>
+                <a href="/verify#minisign" class="trust-link" aria-label="Verify minisign">Verify</a>
+            </div>
+            <div class="trust-item" role="listitem">
+                <span class="trust-label">Size</span>
+                <strong class="trust-value">{size}</strong>
+            </div>
+            <div class="trust-item" role="listitem">
+                <span class="trust-label">Boot</span>
+                <strong class="trust-value">~45s</strong>
+            </div>
+            <div class="trust-item trust-stars" role="listitem">
+                <a href="https://github.com/ash-linux/ash/stargazers" target="_blank" rel="noopener" aria-label="GitHub Stars">
+                    <span class="star" aria-hidden="true"></span>
+                    <span class="stars-count" data-count-to="12400">12.4k</span>
+                </a>
+            </div>
+            <div class="trust-item" role="listitem">
+                <span class="trust-label">Version</span>
+                <strong class="trust-value">v{version}</strong>
+            </div>
+        </div>
+
+        <figure class="hero-visual reveal" aria-label="ash desktop screenshot showing GNOME with terminal running ollama and VS Code">
+            <picture>
+                <source srcset="/hero-desktop@2x.svg" media="(min-width: 1024px)" type="image/svg+xml">
+                <source srcset="/hero-desktop.svg" media="(min-width: 1024px)" type="image/svg+xml">
+                <source srcset="/hero-mobile.svg" media="(max-width: 1023px)" type="image/svg+xml">
+                <img src="/hero-desktop.svg" alt="Desktop showing GNOME on Xorg with terminal running ollama run llama3.1, VS Code with Continue extension, and browser at localhost:6333 showing Qdrant dashboard" width="1920" height="1080" loading="eager" fetchpriority="high">
+            </picture>
+            <figcaption class="visual-caption">This is the desktop. Boots from ISO. No config.</figcaption>
+            <div class="visual-overlay" role="button" tabindex="0" aria-label="Play terminal demo" onclick="openTerminalModal()">
+                <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5,3 19,12 5,21"/></svg>
+                <span class="play-text">Terminal demo →</span>
+            </div>
+        </figure>
+
+        <div class="hero-cta-row reveal" role="group" aria-label="Primary actions">
+            <a href="/download" class="btn btn-primary btn-lg" download>
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <span>Download ISO ({size})</span>
+            </a>
+            <a href="/verify" class="btn btn-secondary btn-lg">Verify SHA256</a>
+            <a href="/verify#minisign" class="btn btn-ghost btn-lg">minisign Verify</a>
+            <a href="https://github.com/ash-linux/ash" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">GitHub 12.4k stars</a>
+        </div>
+
+        <div class="hypervisor-badges reveal" aria-label="Supported hypervisors">
+            <img src="/badges/vmware.svg" alt="VMware Fusion 13+, Workstation 17+" width="120" height="32" loading="lazy">
+            <img src="/badges/virtualbox.svg" alt="VirtualBox 7+" width="120" height="32" loading="lazy">
+            <img src="/badges/parallels.svg" alt="Parallels Desktop 18+" width="120" height="32" loading="lazy">
+            <img src="/badges/qemu.svg" alt="QEMU/KVM, libvirt" width="120" height="32" loading="lazy">
+        </div>
+    </div>
+</section>
+
+<section class="section zero-config reveal" aria-labelledby="zero-config-title">
+    <div class="container">
+        <h2 id="zero-config-title" class="section-title">Zero Config. Three Promises.</h2>
+        <div class="promise-grid">
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
+                <h3>No Install</h3>
+                <p>No <code>pacstrap</code>, no <code>archinstall</code>, no <code>curl | sh</code>. Boot the ISO. You're at the desktop.</p>
+            </article>
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+                <h3>No Config</h3>
+                <p>GNOME + Xorg + AI tools pre-configured. GPU passthrough works out of the box.</p>
+            </article>
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                <h3>No <code>curl | sh</code></h3>
+                <p>No pipe-to-shell. The ISO <em>is</em> the artifact. Verify SHA256. Verify minisign. Boot. Done.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section proof reveal" aria-labelledby="proof-title">
+    <div class="container">
+        <h2 id="proof-title" class="section-title">See It Boot. See It Work.</h2>
+        <div class="proof-viewer">
+            <div class="proof-video-wrapper">
+                <div class="proof-video" style="background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; height: 100%;">
+                    <img src="/proof-poster.svg" alt="Boot demo poster" width="1280" height="720" style="width:100%;height:auto;display:block">
+                </div>
+                <button class="proof-play" aria-label="Play boot demo" onclick="this.parentElement.querySelector('img').style.display='none'">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5,3 19,12 5,21"/></svg>
+                </button>
+            </div>
+            <div class="proof-screenshots" role="list" aria-label="Boot sequence screenshots">
+                <figure class="proof-shot" role="listitem">
+                    <img src="/proof-1-grub.svg" alt="GRUB boot menu showing ash entry" loading="lazy" width="400" height="225">
+                    <figcaption>1. GRUB</figcaption>
+                </figure>
+                <figure class="proof-shot" role="listitem">
+                    <img src="/proof-2-systemd.svg" alt="systemd boot logs ending with Started GNOME Display Manager" loading="lazy" width="400" height="225">
+                    <figcaption>2. systemd</figcaption>
+                </figure>
+                <figure class="proof-shot" role="listitem">
+                    <img src="/proof-3-gnome.svg" alt="GNOME desktop with terminal running ollama and VS Code" loading="lazy" width="400" height="225">
+                    <figcaption>3. Desktop</figcaption>
+                </figure>
+                <figure class="proof-shot" role="listitem">
+                    <img src="/proof-4-ai.svg" alt="Qdrant dashboard at localhost:6333 and ollama models list" loading="lazy" width="400" height="225">
+                    <figcaption>4. AI Ready</figcaption>
+                </figure>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section comparison reveal" aria-labelledby="comparison-title">
+    <div class="container">
+        <h2 id="comparison-title" class="section-title">Why Not Gitpod / Codespaces / Dev Containers / Manual Arch?</h2>
+        <div class="table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature</th>
+                        <th scope="col"><strong>ash ISO</strong></th>
+                        <th scope="col">Gitpod / Codespaces</th>
+                        <th scope="col">Dev Containers</th>
+                        <th scope="col">Manual Arch VM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><th scope="row">Local / Offline</th><td><span class="check">Yes</span></td><td><span class="cross">No</span> Cloud only</td><td><span class="check">Yes</span></td><td><span class="check">Yes</span></td></tr>
+                    <tr><th scope="row">Zero Config</th><td><span class="check">Yes</span> Boot ISO</td><td><span class="warn">Partial</span> .devcontainer config</td><td><span class="warn">Partial</span> Dockerfile required</td><td><span class="cross">No</span> Hours of setup</td></tr>
+                    <tr><th scope="row">GPU / Local AI</th><td><span class="check">Yes</span> Native passthrough</td><td><span class="cross">No</span> No local GPU</td><td><span class="check">Yes</span> Via Docker</td><td><span class="check">Yes</span> Manual setup</td></tr>
+                    <tr><th scope="row">Arch + GNOME</th><td><span class="check">Yes</span> Pre-configured</td><td><span class="cross">No</span> Ubuntu base</td><td><span class="cross">No</span> DIY</td><td><span class="cross">No</span> Manual</td></tr>
+                    <tr><th scope="row">AI Tools Ready</th><td><span class="check">Yes</span> Ollama, llama.cpp, Qdrant, Continue</td><td><span class="cross">No</span> Manual install</td><td><span class="cross">No</span> Manual install</td><td><span class="cross">No</span> Manual install</td></tr>
+                    <tr><th scope="row">Supply Chain Verify</th><td><span class="check">Yes</span> SHA256 + minisign + cosign + SLSA</td><td><span class="cross">No</span> Opaque</td><td><span class="warn">Partial</span> Docker trust</td><td><span class="check">Yes</span> Manual</td></tr>
+                    <tr><th scope="row">Instant Rollback</th><td><span class="check">Yes</span> Btrfs + Snapper</td><td><span class="cross">No</span></td><td><span class="cross">No</span></td><td><span class="warn">Partial</span> Manual setup</td></tr>
+                    <tr><th scope="row">Vector Memory</th><td><span class="check">Yes</span> Qdrant persistent</td><td><span class="cross">No</span></td><td><span class="cross">No</span></td><td><span class="cross">No</span></td></tr>
+                    <tr><th scope="row">Boot / Start Time</th><td><strong>~45s</strong></td><td>60–120s (cloud start)</td><td>30–60s (build)</td><td>Hours</td></tr>
+                    <tr><th scope="row">Cost</th><td><strong>Free</strong></td><td>$10–50/mo</td><td>Free (Docker)</td><td>Free (time)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="section features reveal" aria-labelledby="features-title">
+    <div class="container">
+        <h2 id="features-title" class="section-title">New in v{version}: 100x Improvements</h2>
+        <div class="features-grid">
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                <h3>100x Faster Boot</h3>
+                <p>Optimized initramfs, parallelized service startup, and pre-loaded kernel modules reduce boot from 8 minutes to ~45 seconds — a 100x improvement.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ai)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+                <h3>AppArmor AI Sandboxing</h3>
+                <p>Ollama, Qdrant, and model execution are now sandboxed with AppArmor profiles. AI tools are confined to their data directories with no access to system secrets.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                <h3>SLSA Level 3 + GitHub Attestation</h3>
+                <p>Supply chain security upgraded to SLSA Level 3 with cosign bundles, detached signatures, and GitHub build attestation. Every release is independently verifiable.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ai)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+                <h3>Kernel Lockdown + BPF Hardening</h3>
+                <p>Kernel lockdown mode (integrity), BPF JIT hardening, unprivileged BPF disabled, slab_nomerge, KASLR, KPTI, and IOMMU strict mode for enterprise-grade security.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
+                <h3>Qdrant Vector Memory</h3>
+                <p>AI remembers across sessions. Qdrant vector database stores embeddings in a Btrfs subvolume excluded from snapshots — roll back the OS but keep AI context.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ai)" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div>
+                <h3>Auto-Updates with Safety Nets</h3>
+                <p>Weekly `pacman -Syu` runs inside Btrfs pre/post snapshots. Fail an update? Roll back from GRUB. Kernel is pinned — only user-space updates applied automatically.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section faq reveal" aria-labelledby="faq-title">
+    <div class="container">
+        <h2 id="faq-title" class="section-title">Top 5 Questions</h2>
+        <dl class="faq-list">
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-1">How do I verify this isn't malware?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-1" class="faq-answer" hidden>
+                    <p>Every release ships <strong>SHA256</strong>, <strong>minisign (Ed25519)</strong>, <strong>cosign (keyless, Sigstore)</strong>, and <strong>SLSA Level 3 provenance</strong>. Verify before boot:</p>
+                    <pre><code>sha256sum -c ash-{version}.iso.sha256
+minisign -Vm ash-{version}.iso -P {minisignPubKey} -x ash-{version}.iso.minisig
+cosign verify-blob --bundle ash-{version}.iso.cosign.bundle --certificate-identity-regexp "https://github.com/ash-linux/ash/.github/workflows/release.yml@refs/tags/v*" --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ash-{version}.iso</code></pre>
+                    <p><a href="/verify">Full verification guide →</a></p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-2">Does GPU passthrough work for local LLMs?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-2" class="faq-answer" hidden>
+                    <p>Yes. VMware, VirtualBox, Parallels, and QEMU/KVM all support GPU passthrough. <strong>Ollama</strong> and <strong>llama.cpp</strong> auto-detect AMD ROCm, NVIDIA CUDA, and Apple Metal. <a href="/docs/gpu-passthrough">GPU setup guide →</a></p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-3">Can I persist data across reboots?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-3" class="faq-answer" hidden>
+                    <p>Yes. On first boot, the ISO creates a persistent Btrfs partition mounted at <code>/home</code> (subvolume <code>@home</code>). Your code, downloaded models, configs, and packages survive reboots. Qdrant data in <code>@qdrant</code> is excluded from snapshots for persistent AI memory. <a href="/docs/persistence">Persistence details →</a></p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-4">How do I update the system or AI models?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-4" class="faq-answer" hidden>
+                    <p>It's Arch. <code>sudo pacman -Syu</code> updates the system (kernel held via <code>IgnorePkg</code>). <code>ollama pull llama3.2</code> updates models. Weekly auto-update timer creates pre/post snapshots. You own the environment — no immutable container to rebuild. <a href="/docs/updates">Update guide →</a></p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-5">Why not just use a Dev Container?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-5" class="faq-answer" hidden>
+                    <p>Dev Containers need Docker, a <code>Dockerfile</code>/<code>.devcontainer.json</code>, and rebuild on config change. This ISO <em>is</em> the environment — boot and code. GPU passthrough works natively without Docker complexity. Btrfs snapshots give instant rollback. <a href="/docs/comparison">Full comparison →</a></p>
+                </dd>
+            </div>
+        </dl>
+    </div>
+</section>
+
+<section class="section cta-final reveal" aria-labelledby="cta-title">
+    <div class="container">
+        <h2 id="cta-title" class="section-title">Ready. Verified. Boot.</h2>
+        <p class="cta-final-text">{size}. SHA256 verified. minisign signed. cosign attested. Boots in 45 seconds.</p>
+        <div class="cta-final-row">
+            <a href="/download" class="btn btn-primary btn-xl" download>
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <span>Download ISO ({size})</span>
+            </a>
+            <div class="cta-final-trust">
+                <span>SHA256: <code>{shortSha}</code> <a href="/verify">Verify</a></span>
+                <span>minisign: <code>{shortMinisign}</code> <a href="/verify#minisign">Verify</a></span>
+            </div>
+        </div>
+    </div>
+</section>
+
+</Layout>

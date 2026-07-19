@@ -1,0 +1,17 @@
+[Unit]
+Description=ISO First-Boot Setup
+ConditionPathExists=!/etc/iso-firstboot-done
+DefaultDependencies=no
+After=systemd-remount-fs.service systemd-sysusers.service systemd-tmpfiles-setup.service
+Before=graphical.target systemd-user-sessions.service
+# NOTE: network-online removed for boot speed — firstboot doesn't need network
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/first-boot.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=graphical.target

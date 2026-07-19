@@ -1,0 +1,14 @@
+disable bluetooth.service
+disable cups.service
+disable cups-browsed.service
+disable avahi-daemon.service
+disable avahi-dnsconfd.service
+disable pkgfile-update.timer
+disable man-db.timer
+disable plocate-updatedb.timer
+disable updatedb.timer
+disable systemd-resolved.service
+disable whoopsie.service
+disable uuidd.socket
+disable debug-shell.service
+disable systemd-networkd-wait-online.service

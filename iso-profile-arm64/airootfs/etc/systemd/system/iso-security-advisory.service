@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Arch Linux security advisories
+Documentation=https://security.archlinux.org/
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/security-advisory-monitor.sh
+StandardOutput=journal+console
+StandardError=journal+console

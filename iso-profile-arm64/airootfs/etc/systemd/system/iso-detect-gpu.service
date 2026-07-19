@@ -1,0 +1,13 @@
+[Unit]
+Description=Detect GPU and Load Drivers
+DefaultDependencies=no
+After=systemd-udevd.service
+Before=display-manager.service graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/detect-gpu.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

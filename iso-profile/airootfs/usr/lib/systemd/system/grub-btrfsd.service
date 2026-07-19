@@ -1,0 +1,11 @@
+[Unit]
+Description=Grub-btrfs daemon
+After=sysroot.mount
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/grub-btrfsd --syslog
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Create post-update snapshot
+When = PostTransaction
+Exec = /usr/bin/snapper -c root create --type post --pre-number %v --description "pacman: %v"

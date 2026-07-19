@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# ash-launcher — AI Command Palette
+set -euo pipefail
+
+LAUNCHER="${ASH_LAUNCHER:-wofi}"
+
+_sanitize() {
+    sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+}
+
+launch_wofi() {
+    local prompt="${1:-Ash Command Palette}"
+    wofi \
+        --show drun,run \
+        --prompt "$prompt" \
+        --term kitty \
+        --allow-images \
+        --cache-file /dev/shm/ash-launcher-cache \
+        --insensitive \
+        --lines 15 \
+        --width 80 \
+        --height 60 \
+        --location 0 \
+        -I \
+        --define "drun-format={icon} {name}" \
+        --define "run-format={cmd}"
+}
+
+launch_rofi() {
+    local prompt="${1:-Ash Command Palette}"
+    rofi \
+        -show combi \
+        -combi-modes "drun,run,window" \
+        -prompt "$prompt" \
+        -theme-str 'window {width: 80%;}' \
+        -terminal kitty \
+        -show-icons
+}
+
+case "$LAUNCHER" in
+    wofi) launch_wofi "$@" ;;
+    rofi) launch_rofi "$@" ;;
+esac

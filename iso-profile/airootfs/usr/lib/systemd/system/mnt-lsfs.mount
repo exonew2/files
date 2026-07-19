@@ -1,0 +1,15 @@
+[Unit]
+Description=LSFS Semantic Filesystem
+Documentation=https://github.com/ash-linux/ash-iso
+After=network.target ollama.service qdrant.service
+Requires=ollama.service qdrant.service
+Before=local-fs.target
+
+[Mount]
+What=lsfs-fuse
+Where=/mnt/lsfs
+Type=fuse.lsfs
+Options=defaults,allow_other,nonempty
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic VM Network Detection
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

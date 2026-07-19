@@ -1,0 +1,10 @@
+[Unit]
+Description=Qdrant gRPC Socket
+PartOf=qdrant.service
+
+[Socket]
+ListenStream=6334
+Accept=yes
+
+[Install]
+WantedBy=sockets.target

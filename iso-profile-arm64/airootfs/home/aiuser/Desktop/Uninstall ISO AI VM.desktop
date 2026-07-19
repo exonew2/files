@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Uninstall ISO AI VM
+Comment=Remove this VM from host system
+Exec=pkexec /home/aiuser/Desktop/iso-uninstall.sh
+Icon=application-exit
+Terminal=true
+Type=Application
+Categories=System;

@@ -1,0 +1,4 @@
+#!/bin/bash
+# /usr/bin/mount.fuse.lsfs — FUSE mount helper for fuse.lsfs filesystem
+# Called by systemd when mounting Type=fuse.lsfs
+exec /usr/lib/lsfs/lsfs-fuse.py "$@"

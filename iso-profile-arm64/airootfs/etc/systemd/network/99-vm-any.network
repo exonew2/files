@@ -1,0 +1,28 @@
+# /etc/systemd/network/99-vm-any.network
+[Match]
+Name=eth* ens* enp* enx* veth* vnet* tap* br*
+
+[Network]
+DHCP=ipv4
+IPv6AcceptRA=yes
+DHCPv6=yes
+IPv6PrivacyExtensions=yes
+LinkLocalAddressing=ipv6
+LLMNR=yes
+MulticastDNS=yes
+DNSOverTLS=opportunistic
+
+[DHCPv4]
+UseDNS=true
+UseNTP=true
+UseHostname=true
+SendHostname=true
+Hostname=iso-ai
+RequestOption=252
+Option252=wpad
+
+[DHCPv6]
+UseDNS=true
+UseNTP=true
+UseHostname=true
+RequestOption=252

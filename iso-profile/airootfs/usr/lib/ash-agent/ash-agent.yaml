@@ -1,0 +1,24 @@
+# Ash Agent Configuration
+# /usr/lib/ash-agent/ash-agent.yaml
+
+ollama:
+  endpoint: "http://localhost:11434"
+  model: "phi3:mini"
+  embedding_model: "nomic-embed-text:v1.5"
+  keep_alive: -1
+
+monitoring:
+  cpu_alert_threshold: 90
+  memory_alert_threshold: 85
+  disk_alert_threshold: 90
+  gpu_temp_alert_threshold: 85
+  check_interval_seconds: 60
+
+notifications:
+  backend: "swaync"
+  app_name: "Ash Agent"
+  urgency: "normal"
+
+dbus:
+  service_name: "org.ash.Agent"
+  object_path: "/org/ash/Agent"

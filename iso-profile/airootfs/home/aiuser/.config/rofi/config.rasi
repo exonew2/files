@@ -1,0 +1,160 @@
+@theme "catppuccin-mocha"
+
+configuration {
+  font: "JetBrains Mono 12";
+  modi: "drun,run,window,emoji";
+  show-icons: true;
+  icon-theme: "Adwaita";
+  drun-display-format: "{icon} {name}";
+  display-drun: "  Apps ";
+  display-run: "  Run ";
+  display-window: "  Window ";
+  display-emoji: "  Emoji ";
+  terminal: "kitty";
+  window-format: "{w} · {c} · {t}";
+  kb-primary-paste: "Control+V,Shift+Insert";
+  kb-secondary-paste: "Control+v,Insert";
+  kb-cancel: "Escape,Control+C,Control+g,Control+q";
+  kb-mode-next: "Shift+Tab";
+  kb-mode-previous: "Control+Tab";
+  kb-row-up: "Up,Control+p";
+  kb-row-down: "Down,Control+n";
+}
+
+@theme "/dev/null"
+
+* {
+  user-icon: "";
+  blue: #89b4fa;
+  mauve: #cba6f7;
+  red: #f38ba8;
+  peach: #fab387;
+  green: #a6e3a1;
+  yellow: #f9e2af;
+  teal: #94e2d5;
+  text: #cdd6f4;
+  subtext1: #bac2de;
+  surface0: #313244;
+  surface1: #45475a;
+  surface2: #585b70;
+  base: #1e1e2e;
+  mantle: #181825;
+  crust: #11111b;
+  overlay0: #6c7086;
+}
+
+window {
+  width: 600px;
+  border-radius: 12px;
+  background-color: @base;
+  border: 2px solid @mauve;
+  padding: 8px;
+}
+
+inputbar {
+  background-color: @surface0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 4px;
+  children: [entry, case-indicator];
+}
+
+entry {
+  font: "JetBrains Mono 14";
+  background-color: transparent;
+  text-color: @text;
+  placeholder-color: @overlay0;
+  placeholder: "Search apps...";
+  cursor: "blink";
+}
+
+case-indicator {
+  text-color: @overlay0;
+  background-color: transparent;
+  padding: 0 8px;
+}
+
+listview {
+  margin: 8px 4px 4px;
+  spacing: 4px;
+  scrollbar: false;
+  lines: 12;
+}
+
+element {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: transparent;
+  text-color: @text;
+}
+
+element.normal.normal {
+  background-color: transparent;
+}
+
+element.normal.urgent {
+  background-color: @red;
+  text-color: @base;
+}
+
+element.normal.active {
+  background-color: @mauve;
+  text-color: @base;
+}
+
+element.selected {
+  background-color: @surface0;
+  text-color: @mauve;
+  border: 1px solid @mauve;
+}
+
+element-icon {
+  size: 28px;
+  margin: 0 8px 0 0;
+}
+
+element-text {
+  font: "JetBrains Mono 12";
+  text-color: inherit;
+  vertical-align: 0.5;
+}
+
+scrollbar {
+  width: 4px;
+  handle-width: 4px;
+  handle-color: @mauve;
+}
+
+sidebar {
+  width: 120px;
+  background-color: @mantle;
+  border-radius: 8px;
+  margin: 4px;
+  padding: 4px;
+}
+
+button {
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 6px;
+  text-color: @text;
+}
+
+button.selected {
+  background-color: @surface0;
+  text-color: @mauve;
+}
+
+message {
+  background-color: @surface0;
+  border-radius: 8px;
+  margin: 4px;
+  padding: 8px;
+}
+
+error-message {
+  background-color: @surface0;
+  border-radius: 8px;
+  padding: 12px;
+  text-color: @red;
+}

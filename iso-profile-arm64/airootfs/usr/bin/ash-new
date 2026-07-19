@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
+
+TEMPLATE_DIR="/usr/share/ash-dev/templates"
+VERSION="1.0.0"
+
+usage() {
+    cat <<EOF
+ash-new — Project Scaffolding Engine v${VERSION}
+
+Usage:
+  ash-new <project-name> [options]
+
+Options:
+  --web        Flask/FastAPI/Next.js web project
+  --ai         LLM app with Ollama SDK
+  --rust       Rust CLI project
+  --go         Go API project
+  --python     Python data science project
+  --list       List available templates
+  --help       Show this help
+
+Examples:
+  ash-new my-project
+  ash-new my-project --web
+  ash-new my-project --ai
+  ash-new my-project --rust
+  ash-new my-project --go
+  ash-new my-project --python
+EOF
+    exit 0
+}
+
+list_templates() {
+    echo "Available templates:"
+    for t in "$TEMPLATE_DIR"/*/; do
+        name=$(basename "$t")
+        desc=""
+        case "$name" in
+            python)     desc="FastAPI + Pydantic + SQLAlchemy + pytest + ruff" ;;
+            rust)       desc="Cargo + clap + tokio + serde + tracing" ;;
+            go)         desc="Chi/Gin + sqlx + zap + testify" ;;
+            typescript) desc="Next.js + tRPC + Prisma + Vitest" ;;
+            ai)         desc="Ollama SDK + Qdrant client + LangChain + instructor" ;;
+            data)       desc="Jupyter + Polars + Plotly + MLX" ;;
+        esac
+        printf "  ${CYAN}%-12s${NC} %s\n" "$name" "$desc"
+    done
+}
+
+wizard() {
+    local name="$1"
+    echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║     ash-new Project Wizard          ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
+    echo ""
+    echo "Project: $name"
+    echo ""
+    echo "Select project type:"
+    echo "  1) Python     — FastAPI + Pydantic + SQLAlchemy + pytest"
+    echo "  2) Rust       — Cargo + clap + tokio + serde"
+    echo "  3) Go         — Chi/Gin + sqlx + zap"
+    echo "  4) TypeScript — Next.js + tRPC + Prisma"
+    echo "  5) AI         — Ollama + Qdrant + LangChain"
+    echo "  6) Data       — Jupyter + Polars + Plotly"
+    echo ""
+    echo -n "Choice [1-6]: "
+    read -r choice
+    case "$choice" in
+        1) template="python" ;;
+        2) template="rust" ;;
+        3) template="go" ;;
+        4) template="typescript" ;;
+        5) template="ai" ;;
+        6) template="data" ;;
+        *) echo -e "${RED}Invalid choice${NC}"; exit 1 ;;
+    esac
+    echo -n "Initialize git repo? [Y/n]: "
+    read -r do_git
+    echo -n "Install pre-commit hooks? [Y/n]: "
+    read -r do_precommit
+    scaffold "$name" "$template" "$do_git" "$do_precommit"
+}
+
+scaffold() {
+    local name="$1" tmpl="$2" do_git="${3:-y}" do_precommit="${4:-y}"
+    local src="$TEMPLATE_DIR/$tmpl"
+    local dest="$PWD/$name"
+
+    [[ -d "$src" ]] || { echo -e "${RED}Template '$tmpl' not found${NC}"; exit 1; }
+    [[ -d "$dest" ]] && { echo -e "${RED}Directory '$dest' already exists${NC}"; exit 1; }
+
+    echo -e "${BLUE}Scaffolding ${CYAN}$name${NC} from ${CYAN}$tmpl${NC} template..."
+    mkdir -p "$dest"
+    cp -r "$src/"* "$dest/"
+    cp -r "$src/".* "$dest/" 2>/dev/null || true
+
+    # Replace placeholder project name in files
+    find "$dest" -type f -exec sed -i "s/{{project_name}}/$name/g" {} \; 2>/dev/null || true
+    find "$dest" -type f -exec sed -i "s/{{PROJECT_NAME}}/$(echo "$name" | tr '[:lower:]-' '[:upper:]_')/g" {} \; 2>/dev/null || true
+
+    # Create devcontainer
+    mkdir -p "$dest/.devcontainer"
+    cat > "$dest/.devcontainer/devcontainer.json" <<-JSON
+{
+    "name": "$name",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {},
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": ["github.copilot", "eamodio.gitlens"]
+        }
+    }
+}
+JSON
+
+    # Create CI/CD
+    mkdir -p "$dest/.github/workflows"
+    cat > "$dest/.github/workflows/ci.yml" <<-YAML
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: make test
+YAML
+
+    cat > "$dest/.github/workflows/release.yml" <<-YAML
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make build
+      - uses: softprops/action-gh-release@v1
+YAML
+
+    # Create pre-commit config
+    cat > "$dest/.pre-commit-config.yaml" <<-YAML
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+YAML
+
+    # Create Makefile
+    cat > "$dest/Makefile" <<-MAKE
+.PHONY: test build clean setup
+
+setup:
+	@echo "Setting up $name..."
+	@test -f .devcontainer/setup.sh && bash .devcontainer/setup.sh || true
+
+test:
+	@echo "Running tests..."
+	@echo "No tests configured yet"
+
+build:
+	@echo "Building..."
+	@echo "No build configured yet"
+
+clean:
+	@echo "Cleaning..."
+	@echo "No clean configured yet"
+MAKE
+
+    # Create .gitignore
+    cat > "$dest/.gitignore" <<-IGNORE
+# Dependencies
+node_modules/
+__pycache__/
+target/
+vendor/
+
+# Build
+dist/
+build/
+*.tar.gz
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+IGNORE
+
+    # Create AI agent instructions in README
+    if [[ ! -f "$dest/README.md" ]]; then
+        cat > "$dest/README.md" <<-README
+# $name
+
+## AI Agent Instructions
+
+This project was scaffolded by \`ash-new\` using the **$tmpl** template.
+
+### Development
+- \`make setup\` — Install dependencies
+- \`make test\` — Run tests
+- \`make build\` — Build project
+- \`make clean\` — Clean artifacts
+
+### Stack
+- Language: $tmpl
+- Testing: Configured for standard tools
+- CI/CD: GitHub Actions (push + release)
+- DevContainer: Ubuntu-based with recommended extensions
+
+### Pre-commit Hooks
+- Trailing whitespace removal
+- End-of-file fixer
+- YAML validation
+- Large file detection
+README
+    fi
+
+    # Git init
+    if [[ "${do_git,,}" != "n" ]]; then
+        (cd "$dest" && git init && git add -A && git commit -m "Initial scaffold from ash-new $tmpl template")
+        echo -e "${GREEN}Git repository initialized${NC}"
+    fi
+
+    # Pre-commit install
+    if [[ "${do_precommit,,}" != "n" ]] && command -v pre-commit &>/dev/null; then
+        (cd "$dest" && pre-commit install 2>/dev/null) || true
+        echo -e "${GREEN}Pre-commit hooks installed${NC}"
+    fi
+
+    echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║  Project created: ${CYAN}$dest${GREEN}        ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${BLUE}cd${NC} $name"
+    echo -e "  ${BLUE}make${NC} setup"
+    echo -e "  ${BLUE}make${NC} test"
+}
+
+# ─── CLI Entry ────────────────────────────────────────────────────
+[[ $# -eq 0 ]] && { usage; exit 0; }
+
+case "$1" in
+    --help|-h) usage ;;
+    --list|-l) list_templates; exit 0 ;;
+esac
+
+NAME="$1"
+shift
+
+if [[ $# -eq 0 ]]; then
+    wizard "$NAME"
+else
+    case "$1" in
+        --web) tmpl="typescript" ;;
+        --ai)  tmpl="ai" ;;
+        --rust) tmpl="rust" ;;
+        --go)  tmpl="go" ;;
+        --python) tmpl="python" ;;
+        *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
+    esac
+    scaffold "$NAME" "$tmpl" "y" "y"
+fi

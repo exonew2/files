@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
+
+VERSION_FILE="/etc/ash-version"
+CHANGELOG_FILE="/usr/share/doc/ash/changelog.md"
+ISO_RELEASE_URL="https://api.github.com/repos/ash-linux/ash/releases/latest"
+CURRENT_VERSION=""
+
+if [[ -f "$VERSION_FILE" ]]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE")
+else
+    CURRENT_VERSION="0.0.0-dev"
+fi
+
+usage() {
+    cat <<EOF
+ash-version — Version Manager v${CURRENT_VERSION}
+
+Usage:
+  ash-version                Show version info
+  ash-version check          Check for updates
+  ash-version update         Update to latest ISO version
+  ash-version changelog      Show changelog
+  ash-version rollback       Rollback to previous ISO version
+  ash-version help           Show this help
+EOF
+    exit 0
+}
+
+cmd_show() {
+    echo -e "${CYAN}ash-iso${NC} v${CURRENT_VERSION}"
+    echo ""
+    echo -e "  Version file:  ${VERSION_FILE}"
+    echo -e "  Kernel:        $(uname -r)"
+    echo -e "  Architecture:  $(uname -m)"
+    echo -e "  User:          $(whoami)"
+    echo -e "  Hostname:      $(hostname)"
+    echo -e "  Uptime:        $(uptime -p 2>/dev/null || uptime)"
+    echo ""
+    if [[ -f /etc/iso-build-date ]]; then
+        echo -e "  Build date:    $(cat /etc/iso-build-date)"
+    fi
+}
+
+cmd_check() {
+    echo -e "${BLUE}Checking for updates...${NC}"
+    local latest=""
+    if command -v curl &>/dev/null; then
+        latest=$(curl -sL "$ISO_RELEASE_URL" 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+    fi
+    if [[ -n "$latest" ]]; then
+        echo -e "  Current: ${CYAN}${CURRENT_VERSION}${NC}"
+        echo -e "  Latest:  ${GREEN}${latest}${NC}"
+        if [[ "$CURRENT_VERSION" != "$latest" ]]; then
+            echo -e "  ${YELLOW}Update available! Run 'ash-version update'${NC}"
+        else
+            echo -e "  ${GREEN}You are up to date${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}Could not check for updates (no network?)${NC}"
+        echo -e "  Current version: ${CYAN}${CURRENT_VERSION}${NC}"
+    fi
+}
+
+cmd_update() {
+    echo -e "${YELLOW}Update functionality requires ISO rebuild${NC}"
+    echo -e "  To update:"
+    echo -e "    1. Pull latest ISO: ${CYAN}./scripts/build-iso.sh $(date +%Y.%m.%d)${NC}"
+    echo -e "    2. Flash to USB:   ${CYAN}dd if=ash-*.iso of=/dev/sdX status=progress${NC}"
+    echo -e "    3. Boot from ISO"
+    echo ""
+    echo -e "  Or if running inside the ISO:"
+    echo -e "    ${CYAN}pacman -Syu${NC} && ${CYAN}ash-version update${NC}"
+    # Inline update mechanism for running systems
+    local latest_url
+    latest_url=$(curl -sL "$ISO_RELEASE_URL" 2>/dev/null | grep '"browser_download_url"' | grep '\.iso$' | head -1 | cut -d'"' -f4)
+    if [[ -n "$latest_url" ]]; then
+        echo -e "  ${GREEN}Latest ISO available at:${NC}"
+        echo -e "    ${CYAN}${latest_url}${NC}"
+    fi
+}
+
+cmd_changelog() {
+    if [[ -f "$CHANGELOG_FILE" ]]; then
+        echo -e "${BLUE}Changelog:${NC}"
+        cat "$CHANGELOG_FILE"
+    else
+        echo -e "${YELLOW}No changelog file found at ${CHANGELOG_FILE}${NC}"
+        echo "v${CURRENT_VERSION}"
+        echo "  - Initial release"
+    fi
+}
+
+cmd_rollback() {
+    if command -v snapper &>/dev/null; then
+        echo -e "${BLUE}Available snapshots:${NC}"
+        snapper list 2>/dev/null | head -20
+        echo ""
+        echo -n "Enter snapshot number to rollback to: "
+        read -r snap_num
+        if [[ -n "$snap_num" ]]; then
+            sudo snapper undochange "$snap_num"..0
+            echo -e "${YELLOW}Rollback applied. Reboot recommended.${NC}"
+        fi
+    elif command -v btrfs &>/dev/null && [[ -d /.ash-snapshots ]]; then
+        echo -e "${BLUE}Available snapshots:${NC}"
+        ls -1 /.ash-snapshots/ 2>/dev/null || echo "  None found"
+        echo ""
+        echo -e "${YELLOW}Reboot into desired snapshot via grub-btrfs${NC}"
+    else
+        echo -e "${RED}No snapshot system available (btrfs + snapper required)${NC}"
+    fi
+}
+
+# ─── CLI ──────────────────────────────────────────────────────────
+case "${1:-}" in
+    ""|show)  cmd_show ;;
+    check)    cmd_check ;;
+    update)   cmd_update ;;
+    changelog) cmd_changelog ;;
+    rollback) cmd_rollback ;;
+    help|-h)  usage ;;
+    *)        echo -e "${RED}Unknown command: $1${NC}"; usage; exit 1 ;;

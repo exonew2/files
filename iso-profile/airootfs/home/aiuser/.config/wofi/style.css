@@ -1,0 +1,99 @@
+/* Wofi — Ash Launcher Theme */
+/* Catppuccin Mocha */
+
+* {
+  font-family: "JetBrains Mono Nerd Font", "JetBrains Mono", "Noto Sans", sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+
+window {
+  background: rgba(17, 17, 27, 0.88);
+  border: 2px solid rgba(203, 166, 247, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+#input {
+  margin: 12px;
+  padding: 12px 16px;
+  background: rgba(49, 50, 68, 0.6);
+  border: 1px solid rgba(69, 71, 90, 0.6);
+  border-radius: 10px;
+  color: #cdd6f4;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+#input:focus {
+  border-color: rgba(203, 166, 247, 0.6);
+  background: rgba(49, 50, 68, 0.8);
+}
+
+#input::placeholder {
+  color: #585b70;
+  font-weight: normal;
+}
+
+#scroll {
+  margin: 4px 8px;
+  padding: 4px;
+}
+
+#inner-box {
+  margin: 4px;
+}
+
+#entry {
+  margin: 2px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+#entry:selected {
+  background: linear-gradient(135deg, rgba(203, 166, 247, 0.2), rgba(137, 180, 250, 0.1));
+  border: 1px solid rgba(203, 166, 247, 0.4);
+}
+
+#entry:selected #text {
+  color: #cba6f7;
+  font-weight: 600;
+}
+
+#entry:selected #img {
+  filter: none;
+}
+
+#text {
+  color: #cdd6f4;
+  margin: 0 8px;
+}
+
+#text:selected {
+  color: #cba6f7;
+}
+
+#img {
+  margin-right: 8px;
+}
+
+/* Category labels */
+#category {
+  color: #6c7086;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 8px 4px;
+  margin: 4px 0 0;
+  border-bottom: 1px solid rgba(69, 71, 90, 0.3);
+}
+
+/* Unselected entry hover */
+#entry:hover {
+  background: rgba(69, 71, 90, 0.3);
+}

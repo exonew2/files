@@ -1,0 +1,13 @@
+[Unit]
+Description=WPAD Proxy Auto-Detection
+After=systemd-networkd.service systemd-resolved.service network-online.target
+Wants=network-online.target
+ConditionPathExists=!/etc/wpad.dat
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/wpad-detect.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network-online.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Ash Workspace — AI Smart Workspace Manager
+Documentation=https://github.com/ash-linux/ash-iso
+After=network.target ollama.service qdrant.service
+BindsTo=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ash-workspace/ash-workspace.py
+Restart=on-failure
+RestartSec=5
+Nice=19
+IOSchedulingClass=idle
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

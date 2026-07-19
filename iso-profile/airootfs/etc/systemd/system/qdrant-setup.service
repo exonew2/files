@@ -1,0 +1,12 @@
+[Unit]
+Description=Qdrant Storage Setup
+Before=qdrant.service
+ConditionPathExists=!/var/lib/qdrant/.initialized
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/qdrant-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

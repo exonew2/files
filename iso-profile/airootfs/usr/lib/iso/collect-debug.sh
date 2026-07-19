@@ -1,0 +1,29 @@
+#!/usr/bin/bash
+# /usr/lib/iso/collect-debug.sh
+set -euo pipefail
+
+OUT="$HOME/iso-debug-$(date '+%Y%m%d-%H%M%S').tar.gz"
+TMP=$(mktemp -d)
+
+journalctl -b -0 --no-pager > "$TMP/journal-boot.txt"
+journalctl -b -1 --no-pager > "$TMP/journal-prev.txt" 2>/dev/null || true
+systemctl status --no-pager > "$TMP/systemctl-status.txt"
+systemctl list-units --failed --no-pager > "$TMP/failed-units.txt"
+dmesg -T > "$TMP/dmesg.txt"
+lspci -vvv > "$TMP/lspci.txt"
+lsusb -v > "$TMP/lsusb.txt" 2>/dev/null || true
+ip addr > "$TMP/ip-addr.txt"
+ip route > "$TMP/ip-route.txt"
+cat /etc/os-release > "$TMP/os-release.txt"
+cat /proc/cmdline > "$TMP/cmdline.txt"
+df -h > "$TMP/df.txt"
+btrfs filesystem usage / > "$TMP/btrfs-usage.txt" 2>/dev/null || true
+snapper list > "$TMP/snapshots.txt" 2>/dev/null || true
+ollama list > "$TMP/ollama-models.txt" 2>/dev/null || true
+curl -sf http://localhost:6333/collections > "$TMP/qdrant-collections.json" 2>/dev/null || true
+
+tar -czf "$OUT" -C "$TMP" .
+rm -rf "$TMP"
+
+echo "Debug archive: $OUT"
+notify-send "ISO Debug" "Logs saved to $OUT" --icon=dialog-information

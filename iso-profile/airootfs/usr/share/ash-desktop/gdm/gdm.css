@@ -1,0 +1,115 @@
+/* GDM Login Screen — Ash Theme */
+/* Catppuccin Mocha palette */
+/* Applied via gdm-settings or /etc/gdm/greeter.css */
+
+@define-color ash-base #1e1e2e;
+@define-color ash-mantle #181825;
+@define-color ash-crust #11111b;
+@define-color ash-mauve #cba6f7;
+@define-color ash-blue #89b4fa;
+@define-color ash-text #cdd6f4;
+@define-color ash-subtext #a6adc8;
+@define-color ash-surface #313244;
+@define-color ash-overlay #6c7086;
+
+/* Login window */
+#loginWindow {
+  background-color: @ash-base;
+  border-radius: 12px;
+  border: 1px solid alpha(@ash-mauve, 0.3);
+}
+
+/* User list */
+#userList {
+  background-color: transparent;
+}
+
+#userList .user-list-item {
+  color: @ash-text;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+#userList .user-list-item:selected {
+  background-color: @ash-surface;
+  border: 1px solid @ash-mauve;
+}
+
+/* Login button */
+#loginButton {
+  background: linear-gradient(135deg, @ash-mauve, @ash-blue);
+  color: @ash-base;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 24px;
+  font-weight: bold;
+}
+
+#loginButton:hover {
+  background: linear-gradient(135deg, @ash-blue, @ash-mauve);
+}
+
+/* Entry fields */
+#passwordEntry,
+#usernameEntry {
+  background-color: @ash-surface;
+  color: @ash-text;
+  border: 1px solid @ash-overlay;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+#passwordEntry:focus,
+#usernameEntry:focus {
+  border-color: @ash-mauve;
+}
+
+/* Clock on login screen */
+#clockDisplay {
+  color: @ash-mauve;
+  font-weight: bold;
+}
+
+/* Prompt labels */
+#promptLabel {
+  color: @ash-subtext;
+}
+
+/* Session toggle button */
+#sessionToggleButton {
+  color: @ash-overlay;
+  background: transparent;
+  border: 1px solid @ash-overlay;
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+
+#sessionToggleButton:hover {
+  color: @ash-mauve;
+  border-color: @ash-mauve;
+}
+
+/* Power button */
+#powerButton {
+  color: @ash-overlay;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+#powerButton:hover {
+  color: @ash-text;
+  background: alpha(@ash-surface, 0.5);
+}
+
+/* Vendor/logo area */
+#vendorName {
+  color: @ash-subtext;
+  font-size: 11px;
+}
+
+/* Background */
+#loginBackground {
+  background-color: @ash-crust;
+}

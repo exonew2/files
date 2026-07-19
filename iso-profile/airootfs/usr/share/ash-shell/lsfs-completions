@@ -1,0 +1,119 @@
+# /usr/share/ash-shell/lsfs-completions
+# Shared LSFS shell integration for bash/zsh/fish
+
+# ── cdlsfs — cd to the semantic search results directory ──
+cdlsfs() {
+    local query="$*"
+    if [[ -z "$query" ]]; then
+        echo "Usage: cdlsfs <search query>"
+        return 1
+    fi
+    local target="/mnt/lsfs/by-content/$query"
+    cd "$target" 2>/dev/null || {
+        echo "LSFS not mounted at /mnt/lsfs" >&2
+        return 1
+    }
+}
+
+# ── lscat — search and cat matching file contents ──
+lscat() {
+    local query="$*"
+    if [[ -z "$query" ]]; then
+        echo "Usage: lscat <search query>"
+        return 1
+    fi
+    local dir="/mnt/lsfs/by-content/$query"
+    if [[ ! -d "$dir" ]]; then
+        echo "LSFS not mounted or no results" >&2
+        return 1
+    fi
+    local f target name
+    for f in "$dir"/*; do
+        name=$(basename "$f")
+        echo "=== $name ==="
+        if [[ -L "$f" ]]; then
+            target=$(readlink "$f")
+            cat "$target" 2>/dev/null || echo "(binary or unreadable)"
+        fi
+        echo ""
+    done
+}
+
+# ── lsfs-exec — find and execute a file by semantic search ──
+lsfs-exec() {
+    local query="$*"
+    if [[ -z "$query" ]]; then
+        echo "Usage: lsfs-exec <query>"
+        return 1
+    fi
+    local dir="/mnt/lsfs/by-content/$query"
+    if [[ ! -d "$dir" ]]; then
+        echo "No results for '$query'" >&2
+        return 1
+    fi
+    local files=("$dir"/*)
+    local target
+    if [[ ${#files[@]} -eq 1 ]]; then
+        target="$(readlink "${files[0]}")"
+    else
+        local i name
+        for i in "${!files[@]}"; do
+            name=$(basename "${files[$i]}")
+            echo "$((i+1))) $name"
+        done
+        echo -n "Select: "
+        read -r sel
+        [[ "$sel" =~ ^[0-9]+$ ]] && [[ "$sel" -ge 1 ]] && [[ "$sel" -le ${#files[@]} ]] || {
+            echo "Invalid selection"
+            return 1
+        }
+        target="$(readlink "${files[$((sel-1))]}")"
+    fi
+    echo "Opening: $target"
+    if [[ -d "$target" ]]; then
+        cd "$target" || return 1
+    elif [[ -x "$target" ]]; then
+        "$target"
+    else
+        ${EDITOR:-nvim} "$target"
+    fi
+}
+
+# ── Bash completions ──
+if [[ -n "${BASH_VERSION:-}" ]]; then
+    __lsfs_by_content() {
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        local qdir="/mnt/lsfs/by-content"
+        if [[ -d "$qdir" ]]; then
+            local queries
+            queries=$(ls "$qdir" 2>/dev/null | tr '\n' ' ')
+            COMPREPLY=($(compgen -W "$queries" -- "$cur"))
+        fi
+    }
+    complete -F __lsfs_by_content cdlsfs lscat lsfs-exec
+
+    __lsfs_path_complete() {
+        local cur="${COMP_WORDS[COMP_CWORD]}"
+        if [[ "$cur" == /mnt/lsfs/* ]]; then
+            local base="${cur%/*}"
+            local prefix="${cur##*/}"
+            if [[ -d "$base" ]]; then
+                COMPREPLY=($(compgen -W "$(ls "$base" 2>/dev/null)" -- "$prefix"))
+                return 0
+            fi
+        fi
+        COMPREPLY=()
+    fi
+    complete -o dirnames -F __lsfs_path_complete ls
+fi
+
+# ── Zsh completions ──
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    _cdlsfs() {
+        local qdir="/mnt/lsfs/by-content"
+        if [[ -d "$qdir" ]]; then
+            _files -W "$qdir"
+        fi
+    }
+    compdef _cdlsfs cdlsfs lscat lsfs-exec
+fi

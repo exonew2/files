@@ -1,0 +1,197 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        run: |
+          find . -name "*.sh" -exec shellcheck {} \;
+      - name: Check Astro
+        run: |
+          cd landing-page && npm ci && npm run build -- --dry-run 2>&1 | head -20
+
+  test-scripts:
+    name: Test Scripts Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax check
+        run: |
+          for f in scripts/*.sh iso-profile/airootfs/usr/lib/iso/*.sh; do
+            bash -n "$f" && echo "✓ $f" || exit 1
+          done
+      - name: Python syntax check
+        run: |
+          python3 -m py_compile iso-profile/airootfs/usr/bin/ai-model-selector
+      - name: Packer HCL syntax check
+        run: |
+          for f in packer/*.pkr.hcl; do
+            echo "Checking $f"
+            head -1 "$f" | grep -q "packer" && echo "✓ $f" || echo "WARNING: $f may not be valid HCL"
+          done
+
+  validate-packer:
+    name: Validate Packer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-packer@v2
+      - name: Packer fmt check
+        run: packer fmt -check packer/
+      - name: Packer validate
+        run: |
+          cd packer && packer init . && packer validate ash-iso.pkr.hcl
+      - name: Validate Vagrant template
+        run: |
+          cd packer && if [[ -f vagrant-box.pkr.hcl ]]; then
+            packer validate vagrant-box.pkr.hcl
+          fi
+
+  validate-iso-profile:
+    name: Validate ISO Profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check mkarchiso profile
+        run: |
+          test -f iso-profile/packages.x86_64
+          test -f iso-profile/profiledef.sh
+          test -f iso-profile/airootfs/etc/pacman.conf
+          test -d iso-profile/airootfs/etc/systemd/system
+          echo "ISO profile structure valid"
+      - name: Verify profiledef.sh syntax
+        run: |
+          bash -n iso-profile/profiledef.sh && echo "✓ profiledef.sh"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+      - name: Run Grype vulnerability scan
+        uses: anchore/scan-action@v4
+        with:
+          path: '.'
+          fail-build: false
+      - name: Check for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sbom:
+    name: Generate SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CycloneDX
+        run: |
+          npm install -g @cyclonedx/bom
+      - name: Generate SBOM from packages.x86_64
+        run: |
+          echo "Generating SBOM from ISO package manifest..."
+          cat > sbom.json << 'SBOM'
+          {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "version": 1,
+            "metadata": {
+              "component": {
+                "name": "ash-iso",
+                "version": "${{ github.sha }}",
+                "type": "operating-system"
+              }
+            },
+            "components": [
+          SBOM
+          FIRST=true
+          while IFS= read -r pkg; do
+            [[ -z "$pkg" || "$pkg" =~ ^# ]] && continue
+            if [ "$FIRST" = true ]; then
+              echo "              { \"name\": \"$pkg\", \"type\": \"library\" }" >> sbom.json
+              FIRST=false
+            else
+              echo "              ,{ \"name\": \"$pkg\", \"type\": \"library\" }" >> sbom.json
+            fi
+          done < iso-profile/packages.x86_64
+          echo "            ]" >> sbom.json
+          echo "          }" >> sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
+
+  image-size-regression:
+    name: Image Size Regression Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check package count and estimate size
+        run: |
+          PKG_COUNT=$(grep -cve '^\s*#' iso-profile/packages.x86_64)
+          echo "Package count: $PKG_COUNT"
+          echo "PKG_COUNT=$PKG_COUNT" >> $GITHUB_ENV
+          HISTORY_FILE=".github/size-history.txt"
+          mkdir -p .github
+          if [[ -f "$HISTORY_FILE" ]]; then
+            LAST_COUNT=$(tail -1 "$HISTORY_FILE" | cut -d, -f1)
+            echo "Last PR package count: $LAST_COUNT"
+            THRESHOLD=$(( LAST_COUNT * 120 / 100 ))
+            if [[ $PKG_COUNT -gt $THRESHOLD ]]; then
+              echo "WARNING: Package count increased by more than 20% over last PR"
+            fi
+          fi
+          echo "$PKG_COUNT,${GITHUB_SHA}" >> "$HISTORY_FILE"
+
+  # Experimental: ARM64 cross-build validation
+  validate-arm64-profile:
+    name: Validate ARM64 Profile (Experimental)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for ARM64 compatibility
+        run: |
+          echo "Checking package availability for aarch64..."
+          BAD_PKGS=""
+          # Packages that are x86_64 only
+          while IFS= read -r pkg; do
+            [[ -z "$pkg" || "$pkg" =~ ^# || "$pkg" =~ ^base || "$pkg" =~ ^linux ]] && continue
+            case "$pkg" in
+              *virtualbox*|*vmware*|*edk2-ovmf*|*snapper-gui-git*)
+                BAD_PKGS="$BAD_PKGS $pkg"
+                ;;
+            esac
+          done < iso-profile/packages.x86_64
+          if [[ -n "$BAD_PKGS" ]]; then
+            echo "WARNING: These packages may not be available on aarch64:$BAD_PKGS"
+            echo "ARM64_BUILD_STATUS=partial" >> $GITHUB_ENV
+          else
+            echo "ARM64_BUILD_STATUS=valid" >> $GITHUB_ENV
+          fi

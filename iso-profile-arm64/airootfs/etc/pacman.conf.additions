@@ -1,0 +1,18 @@
+# /etc/pacman.conf additions (appended to main pacman.conf in profile)
+
+# Held packages (kernel, firmware)
+IgnorePkg = linux linux-headers linux-firmware
+
+# Performance
+ParallelDownloads = 8
+
+# Signature verification
+SigLevel = Required DatabaseOptional
+LocalFileSigLevel = Required
+RemoteFileSigLevel = Required
+
+# Mirror sorting
+XferCommand = /usr/bin/curl -C - -f -L -o %o %u
+
+# Misc
+ILoveCandy

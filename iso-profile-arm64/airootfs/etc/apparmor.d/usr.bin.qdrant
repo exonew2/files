@@ -1,0 +1,34 @@
+# /etc/apparmor.d/usr.bin.qdrant — AppArmor profile for Qdrant vector DB
+include <tunables/global>
+
+/usr/bin/qdrant {
+    include <abstractions/base>
+    include <abstractions/nameservice>
+
+    # Qdrant binary
+    /usr/bin/qdrant mr,
+    /usr/lib/qdrant/** mr,
+
+    # Qdrant data directory
+    /var/lib/qdrant/** rwk,
+    /run/qdrant/** rw,
+
+    # Configuration
+    /etc/qdrant/config.yaml r,
+
+    # Libraries
+    /usr/lib/** mr,
+
+    # Network for gRPC and HTTP
+    network tcp dgram,
+    network inet dgram,
+    network inet6 dgram,
+
+    # Deny access to sensitive files
+    deny /etc/shadow rwklx,
+    deny /etc/gshadow rwklx,
+    deny /home/** rwklx,
+
+    # Process management
+    signal (send) set=(kill,term,hup,int) peer=/usr/bin/qdrant,
+}

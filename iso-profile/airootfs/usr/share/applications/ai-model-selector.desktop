@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=AI Model Selector
+Comment=Download and manage Ollama models
+Exec=ai-model-selector
+Icon=applications-science
+Terminal=false
+Type=Application
+Categories=Development;AI;

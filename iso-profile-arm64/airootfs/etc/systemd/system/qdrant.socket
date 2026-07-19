@@ -1,0 +1,11 @@
+[Unit]
+Description=Qdrant HTTP Socket
+PartOf=qdrant.service
+
+[Socket]
+ListenStream=6333
+Accept=yes
+MaxConnections=100
+
+[Install]
+WantedBy=sockets.target

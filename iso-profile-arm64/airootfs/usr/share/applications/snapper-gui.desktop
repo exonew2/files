@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Snapshot Manager
+Comment=Manage Btrfs snapshots
+Exec=snapper-gui
+Icon=system-software-update
+Terminal=false
+Type=Application
+Categories=System;Settings;

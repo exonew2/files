@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Auto Update
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=4h
+
+[Install]
+WantedBy=timers.target

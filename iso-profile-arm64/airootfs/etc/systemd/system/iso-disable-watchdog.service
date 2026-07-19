@@ -1,0 +1,13 @@
+[Unit]
+Description=Disable unnecessary services for boot speed
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iso/disable-unnecessary.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

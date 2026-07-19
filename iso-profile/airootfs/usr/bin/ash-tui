@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# ash-tui — Launch the Terminal Dashboard
+exec python3 /usr/share/ash-tui/ash-tui.py "$@"
