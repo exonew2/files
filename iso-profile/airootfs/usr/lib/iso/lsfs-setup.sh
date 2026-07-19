@@ -66,7 +66,7 @@ systemctl daemon-reload
 systemctl enable mnt-lsfs.mount 2>/dev/null || log "WARNING: mnt-lsfs.mount not found"
 
 # 8. Pull multilingual embedding model (Bottleneck 8)
-ollama pull intfloat/multilingual-e5-small 2>/dev/null || \
-    log "WARNING: multilingual-e5-small model pull failed — run: ollama pull intfloat/multilingual-e5-small"
+ollama pull nomic-embed-text 2>/dev/null || \
+    log "WARNING: nomic-embed-text model pull failed — run: ollama pull nomic-embed-text"
 
 log "LSFS setup complete — mount with: systemctl start mnt-lsfs.mount"

@@ -28,7 +28,7 @@ if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
     ok "Ollama is running"
     # Pin model in VRAM
     curl -s -X POST http://localhost:11434/api/generate \
-        -d '{"model":"intfloat/multilingual-e5-small","keep_alive":-1,"prompt":""}' >/dev/null && \
+        -d '{"model":"nomic-embed-text","keep_alive":-1,"prompt":""}' >/dev/null && \
         ok "Model pinned in VRAM"
 else
     warn "Ollama not reachable — run: sudo systemctl start ollama"

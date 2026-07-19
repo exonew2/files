@@ -126,8 +126,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("lsfs")
 
 OLLAMA_URL = "http://localhost:11434/api/embeddings"
-MODEL = "intfloat/multilingual-e5-small"
-EMBED_DIM = 384
+MODEL = "nomic-embed-text"
+EMBED_DIM = 768
 QDRANT_SOCKET = "/tmp/lsfs.sock"
 QDRANT_TCP = "http://localhost:6333"
 WATCH_DIRS = [os.path.expanduser("~")]
@@ -431,7 +431,7 @@ def notify_via(message):
         pass
 
 async def get_embedding_async(session, text, retries=2):
-    payload = {"model": MODEL, "prompt": f"passage: {text}"[:2048], "keep_alive": -1}
+    payload = {"model": MODEL, "prompt": text[:2048], "keep_alive": -1}
     for attempt in range(retries):
         try:
             async with session.post(OLLAMA_URL, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
@@ -678,8 +678,8 @@ import sys, json, os, subprocess, argparse, urllib.request, urllib.error, textwr
 from datetime import datetime
 
 OLLAMA_URL = "http://localhost:11434/api/embeddings"
-MODEL = "intfloat/multilingual-e5-small"
-EMBED_DIM = 384
+MODEL = "nomic-embed-text"
+EMBED_DIM = 768
 COSINE_FLOOR = 0.5
 QDRANT_SOCKET = "/tmp/lsfs.sock"
 QDRANT_TCP = "http://localhost:6333"
@@ -841,7 +841,7 @@ def search_hybrid(query, limit=SEARCH_LIMIT):
     results = []
     seen_paths = set()
     clean_query, qfilter = parse_query_filters(query)
-    prefixed_query = f"query: {clean_query}"
+    prefixed_query = clean_query
     req = urllib.request.Request(OLLAMA_URL, data=json.dumps({"model": MODEL, "prompt": prefixed_query[:2048], "keep_alive": -1}).encode(), headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=3.0) as resp:
@@ -897,7 +897,7 @@ def index_file(filepath):
     content = extract_file_content(filepath)
     if not content.strip():
         return False
-    prefixed = f"passage: {content}"
+    prefixed = content
     req = urllib.request.Request(OLLAMA_URL, data=json.dumps({"model": MODEL, "prompt": prefixed[:2048], "keep_alive": -1}).encode(), headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=3.0) as resp:
@@ -1209,7 +1209,7 @@ systemctl --user enable --now lsfs-parity.timer
 # Configure Ollama keep_alive=-1 (Fix 2)
 # This keeps multilingual-e5-small permanently in VRAM
 curl -X POST http://localhost:11434/api/generate \
-  -d '{"model":"intfloat/multilingual-e5-small","keep_alive":-1,"prompt":""}' 2>/dev/null || true
+  -d '{"model":"nomic-embed-text","keep_alive":-1,"prompt":""}' 2>/dev/null || true
 
 # ── Fix 3: Configure Qdrant for CPU-only ──────────────────────────────────
 sudo tee /etc/systemd/system/qdrant.service.d/cpu-only.conf > /dev/null << 'QCONF'
@@ -1258,7 +1258,7 @@ echo ""
 | 5 | CPU Throttling | `Nice=19`, `IOSchedulingClass=idle` in systemd service | ✅ |
 | 6 | Semantic Code Destruction | `ast` module fallback (when tree-sitter unavailable) chunks by function/class | ✅ |
 | 7 | Poor Keyword Recall | Dense Vector + BM25 hybrid search in Qdrant | ✅ |
-| 8 | Cross-Lingual Mismatches | `intfloat/multilingual-e5-small` (384-dim) with E5 `query:`/`passage:` prefixes | ✅ |
+| 8 | Cross-Lingual Mismatches | `nomic-embed-text` (768-dim, multilingual-capable) | ✅ |
 | 9 | Memory Leaks Over Time | `gc.collect()` every 1000 files, `weakref` for callbacks, no persistent DB connections | ✅ |
 | 10 | Git Branch Switching Freezes | `.git/HEAD` watcher clears repo vectors + re-indexes at `nice -n 19` | ✅ |
 | 11 | Symlink Infinite Loops | `os.path.islink()` skip in `os.walk`, LSFSIgnore default patterns for `.venv`, `node_modules`, etc. | ✅ |
@@ -1270,7 +1270,7 @@ echo ""
 | 17 | Context Switching Overhead / Cold Cache | `asyncio` + `aiohttp` for non-blocking Ollama; `ExecStartPost` warmup query | ✅ |
 | 18 | JSON Serialization | Null byte strip + strict UTF-8 enforce before HTTP | ✅ |
 | 19 | Focus Stealing Prevention (Wayland) | Daemon uses `notify-send` only; `hyprctl dispatch exec` only on user selection in launcher | ✅ |
-| 20 | Model Version Drift | Version-locked `intfloat/multilingual-e5-small` + re-index on mismatch | ✅ |
+| 20 | Model Version Drift | Version-locked `nomic-embed-text` (768-dim) + re-index on mismatch | ✅ |
 | 21 | Unix Socket Bottlenecks | Qdrant on `/tmp/lsfs.sock` UDS (40% latency reduction), TCP fallback | ✅ |
 | 22 | Silent Daemon Crashes | `Restart=always`, `RestartSec=5`, `journalctl` logging (merged into Fix 17) | ✅ |
 | 23 | Low-Confidence Dead Ends | Cosine threshold 0.5 → `fd`/`fzf` keyword fallback | ✅ |

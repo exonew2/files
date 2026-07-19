@@ -162,7 +162,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now lsfs-daemon.service 2>/dev/null && ok "LSFS daemon started" || warn "Daemon failed — run: systemctl --user start lsfs-daemon"
 
 # Pin model in VRAM
-curl -X POST http://localhost:11434/api/generate -d '{"model":"intfloat/multilingual-e5-small","keep_alive":-1,"prompt":""}' 2>/dev/null && ok "Model pinned" || warn "Ollama not reachable"
+curl -X POST http://localhost:11434/api/generate -d '{"model":"nomic-embed-text","keep_alive":-1,"prompt":""}' 2>/dev/null && ok "Model pinned" || warn "Ollama not reachable"
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════╗${NC}"

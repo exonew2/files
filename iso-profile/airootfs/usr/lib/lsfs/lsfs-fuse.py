@@ -14,8 +14,8 @@ except ImportError:
 
 MOUNTPOINT = "/mnt/lsfs"
 COLLECTION = "apps"
-MODEL = "intfloat/multilingual-e5-small"
-EMBED_DIM = 384
+MODEL = "nomic-embed-text"
+EMBED_DIM = 768
 COSINE_THRESHOLD = 0.5
 CACHE_TTL = 30
 RECENT_DAYS = 7
@@ -78,7 +78,7 @@ def _qdrant(method, path, data=None, timeout=3):
         return None
 
 def _embed(text, retries=1):
-    prefixed = "query: " + text
+    text
     payload = json.dumps({
         "model": MODEL, "prompt": prefixed[:2048], "keep_alive": -1
     }).encode()
