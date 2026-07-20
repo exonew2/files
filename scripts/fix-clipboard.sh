@@ -11,34 +11,37 @@ echo -e "${CYAN}─────────────────────�
 echo -e "${CYAN}  VMware Clipboard Fix${NC}"
 echo -e "${CYAN}────────────────────────────────────────────${NC}"
 
-info "Installing spice-vdagent open-vm-tools..."
-sudo pacman -S --needed --noconfirm spice-vdagent open-vm-tools 2>/dev/null || \
-    warn "Package install had issues — try: sudo pacman -S spice-vdagent open-vm-tools"
+if ! systemd-detect-virt --vm 2>/dev/null | grep -qi vmware; then
+    warn "Not running in a VMware VM — skipping"
+    exit 0
+fi
 
-info "Enabling spice-vdagentd.service..."
-sudo systemctl enable --now spice-vdagentd.service 2>/dev/null && ok "spice-vdagentd started" || \
-    warn "spice-vdagentd failed to start"
+info "Installing open-vm-tools..."
+sudo pacman -S --needed --noconfirm open-vm-tools 2>/dev/null || \
+    warn "Package install had issues — try: sudo pacman -S open-vm-tools"
 
 info "Enabling vmtoolsd.service..."
 sudo systemctl enable --now vmtoolsd.service 2>/dev/null && ok "vmtoolsd started" || \
     warn "vmtoolsd failed to start"
 
-info "Creating Hyprland exec.conf..."
-mkdir -p "$HOME/.config/hypr"
-cat > "$HOME/.config/hypr/exec.conf" << 'CONF'
-exec-once = spice-vdagent
-CONF
-ok "exec.conf created"
+info "Enabling vmware-vmblock-fuse.service..."
+sudo systemctl enable --now vmware-vmblock-fuse.service 2>/dev/null && ok "vmware-vmblock-fuse started" || \
+    warn "vmware-vmblock-fuse failed to start"
 
-info "Adding udev rule for VMware guest isolation..."
-UDEV_RULE='SUBSYSTEM=="misc", KERNEL=="vmw_vmci", GROUP="vmware", MODE="0660"'
-if [ ! -f /etc/udev/rules.d/99-vmware-guest-isolation.rules ]; then
-    echo "$UDEV_RULE" | sudo tee /etc/udev/rules.d/99-vmware-guest-isolation.rules > /dev/null
-    sudo udevadm control --reload-rules 2>/dev/null || true
-    sudo udevadm trigger 2>/dev/null || true
-    ok "Udev rule added"
+info "Adding vmware-user to Hyprland config..."
+mkdir -p "$HOME/.config/hypr"
+if [ -f "$HOME/.config/hypr/hyprland.conf" ]; then
+    if ! grep -q "vmware-user" "$HOME/.config/hypr/hyprland.conf" 2>/dev/null; then
+        echo "exec-once = vmware-user" >> "$HOME/.config/hypr/hyprland.conf"
+        ok "vmware-user added to hyprland.conf"
+    else
+        ok "vmware-user already in hyprland.conf"
+    fi
 else
-    ok "Udev rule already exists"
+    cat > "$HOME/.config/hypr/hyprland.conf" << 'CONF'
+exec-once = vmware-user
+CONF
+    ok "hyprland.conf created with vmware-user"
 fi
 
 echo ""
@@ -46,12 +49,16 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║  VMware Clipboard Fix Applied                             ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${YELLOW}HOST SIDE — Add these lines to your .vmx file:${NC}"
-echo "  isolation.tools.copy.disable = \"FALSE\""
-echo "  isolation.tools.paste.disable = \"FALSE\""
+echo -e "${YELLOW}================================================${NC}"
+echo -e "${YELLOW}⚠️  YOU MUST ALSO FIX THE WINDOWS HOST:${NC}"
+echo -e "${YELLOW}================================================${NC}"
+echo "1. On your Windows host, open:"
+echo "   C:\\Users\\pc\\Documents\\Virtual Machines\\Windows 10\\Windows 10.vmx"
+echo "2. Add these lines at the bottom:"
+echo '   isolation.tools.copy.disable = "FALSE"'
+echo '   isolation.tools.paste.disable = "FALSE"'
+echo '   isolation.tools.setGUIOptions.enable = "TRUE"'
+echo "3. Save the file and restart the VM"
+echo -e "${YELLOW}================================================${NC}"
 echo ""
-echo "After editing .vmx, restart the VM for full clipboard support."
-echo ""
-echo "To source exec.conf in Hyprland, ensure your hyprland.conf has:"
-echo "  source = ~/.config/hypr/exec.conf"
-echo "Then run: hyprctl reload"
+notify-send "Clipboard fix applied. Reboot VM + edit .vmx on host." 2>/dev/null || true

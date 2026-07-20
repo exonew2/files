@@ -87,132 +87,68 @@ notify-send -t 3000 -r 999 "Agentic OS" "Searching: $QUERY"
 RESULTS_FILE=$(mktemp /tmp/lsfs_results.XXXXXX)
 trap 'rm -f "$RESULTS_FILE"' EXIT
 
-SEARCH_ERR=""
 HAS_RESULTS=0
 
-PYSCRIPT="$HOME/.config/scripts/lsfs_query.py"
-if [ -f "$PYSCRIPT" ]; then
-    timeout 10 python3 "$PYSCRIPT" --list-mode "$QUERY" > "$RESULTS_FILE" 2>/tmp/lsfs_err.$$ || true
-    SEARCH_ERR=$(cat /tmp/lsfs_err.$$ 2>/dev/null)
-    rm -f /tmp/lsfs_err.$$
-    if [ -s "$RESULTS_FILE" ] && ! head -1 "$RESULTS_FILE" | grep -q "No matches"; then
-        HAS_RESULTS=1
-    fi
-fi
-
-if [ "$HAS_RESULTS" -eq 0 ]; then
-    if echo "$SEARCH_ERR" | grep -qi "ollama\|connect.*11434\|timeout\|refused"; then
-        notify-send -u critical -t 5000 "Agentic OS" "Ollama not running — start with: systemctl start ollama"
-    elif echo "$SEARCH_ERR" | grep -qi "qdrant\|connect.*6333\|refused"; then
-        notify-send -u critical -t 5000 "Agentic OS" "Qdrant not running — start with: systemctl start qdrant"
-    fi
-fi
-
-if [ "$HAS_RESULTS" -eq 0 ]; then
-    python3 - "$QUERY" > "$RESULTS_FILE" 2>/tmp/lsfs_fb_err.$$ << 'PYFALLBACK' || true
-import sys, json, os, urllib.request, http.client, socket
-OLLAMA_URL = "http://localhost:11434/api/embeddings"
-MODEL = "nomic-embed-text"
-QDRANT_SOCKET = "/tmp/lsfs.sock"
-QDRANT_TCP = "http://localhost:6333"
-COSINE_FLOOR = 0.5
-SEARCH_LIMIT = 20
-def qdrant_req(method, path, data=None, timeout=2):
-    api_path = f"/collections/apps/{path.lstrip('/')}"
-    body = json.dumps(data).encode() if data else None
-    headers = {"Content-Type": "application/json"}
-    if os.path.exists(QDRANT_SOCKET):
-        try:
-            conn = http.client.HTTPConnection("localhost", timeout=timeout)
-            conn.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            conn.sock.settimeout(timeout)
-            conn.sock.connect(QDRANT_SOCKET)
-            conn.request(method, api_path, body=body, headers=headers)
-            resp = conn.getresponse()
-            result = json.loads(resp.read())
-            conn.close()
-            return result
-        except Exception:
-            pass
-    url = f"{QDRANT_TCP}{api_path}"
-    req = urllib.request.Request(url, data=body, method=method)
-    req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read())
-    except Exception:
-        return {}
-def ensure_collection():
-    info = qdrant_req("GET", "", timeout=1.0)
-    return "result" in info
-def search(query, limit=SEARCH_LIMIT):
-    req = urllib.request.Request(OLLAMA_URL, data=json.dumps({"model": MODEL, "prompt": query[:2048], "keep_alive": -1}).encode(), headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=3.0) as resp:
-        emb_data = json.loads(resp.read())
-    embedding = emb_data.get("embedding")
-    if not embedding:
-        sys.exit(1)
-    search_payload = {"vector": embedding, "limit": limit, "with_payload": True}
-    hits = qdrant_req("POST", "points/search", search_payload, timeout=2.0)
-    results = []
-    seen_paths = set()
-    for hit in hits.get("result", []):
-        score = hit.get("score", 0)
-        payload = hit.get("payload", {})
-        path = payload.get("path", "")
-        if score < COSINE_FLOOR or path in seen_paths:
-            continue
-        seen_paths.add(path)
-        results.append({"path": path, "name": payload.get("name", ""), "score": score})
-    results.sort(key=lambda r: r['score'], reverse=True)
-    return results
-if __name__ == "__main__":
-    query = sys.argv[1] if len(sys.argv) > 1 else ""
-    if not query:
-        sys.exit(1)
-    if not ensure_collection():
-        print("| No matches (Qdrant collection not found)")
-        sys.exit(0)
-    results = search(query)
-    if not results:
-        print(f"| No matches found for '{query}'.")
-    for r in results:
-        print(f"{r['path']} | {r['name']} ({r['score']:.3f})")
-PYFALLBACK
-    FB_ERR=$(cat /tmp/lsfs_fb_err.$$ 2>/dev/null)
-    rm -f /tmp/lsfs_fb_err.$$
-    if [ -s "$RESULTS_FILE" ] && ! head -1 "$RESULTS_FILE" | grep -q "No matches"; then
-        HAS_RESULTS=1
-    elif [ "$HAS_RESULTS" -eq 0 ] && [ -n "$FB_ERR" ]; then
-        if echo "$FB_ERR" | grep -qi "ollama\|connect.*11434\|refused\|timeout\|timed out"; then
-            notify-send -u critical -t 5000 "Agentic OS" "Ollama not running — start with: systemctl start ollama"
-        elif echo "$FB_ERR" | grep -qi "qdrant\|connect.*6333\|refused"; then
-            notify-send -u critical -t 5000 "Agentic OS" "Qdrant not running — start with: systemctl start qdrant"
-        elif echo "$FB_ERR" | grep -qi "error"; then
-            notify-send -u critical -t 5000 "Agentic OS" "Search error: $FB_ERR"
+if command -v curl &>/dev/null; then
+    OLLAMA_RESP=$(curl -s --max-time 5 -X POST http://localhost:11434/api/embeddings \
+        -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"${QUERY//\"/\\\"}\",\"keep_alive\":-1}" 2>/dev/null) || true
+    if [ -n "$OLLAMA_RESP" ]; then
+        EMBEDDING=$(echo "$OLLAMA_RESP" | tr -d '\n' | sed -n 's/.*"embedding":\(\[[^]]*\]\).*/\1/p') || true
+        if [ -n "${EMBEDDING:-}" ]; then
+            VECTOR=$(echo "$EMBEDDING" | tr -d ' \t\n')
+            PAYLOAD="{\"vector\":$VECTOR,\"limit\":10,\"with_payload\":true}"
+            QDRANT_RESP=""
+            if [ -S /tmp/lsfs.sock ]; then
+                QDRANT_RESP=$(curl -s --max-time 5 --unix-socket /tmp/lsfs.sock \
+                    -X POST http://localhost/collections/apps/points/search \
+                    -H "Content-Type: application/json" -d "$PAYLOAD" 2>/dev/null) || true
+            fi
+            if [ -z "${QDRANT_RESP:-}" ]; then
+                QDRANT_RESP=$(curl -s --max-time 5 \
+                    -X POST http://localhost:6333/collections/apps/points/search \
+                    -H "Content-Type: application/json" -d "$PAYLOAD" 2>/dev/null) || true
+            fi
+            if [ -n "${QDRANT_RESP:-}" ]; then
+                while IFS= read -r block; do
+                    if echo "$block" | grep -q '"path"'; then
+                        FPATH=$(echo "$block" | sed 's/.*"path":"\([^"]*\)".*/\1/')
+                        FNAME=$(echo "$block" | sed 's/.*"name":"\([^"]*\)".*/\1/')
+                        SCORE=$(echo "$block" | sed 's/.*"score":\([0-9.]*\).*/\1/')
+                        [ -n "$FPATH" ] && echo "$FPATH | $FNAME ($SCORE)"
+                    fi
+                done < <(echo "$QDRANT_RESP" | tr -d '\n' | sed 's/},{/}\n{/g') > "$RESULTS_FILE"
+                [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
+            else
+                notify-send -u critical -t 5000 "Agentic OS" "Qdrant not running. Start: systemctl start qdrant"
+            fi
         fi
+    else
+        notify-send -u critical -t 5000 "Agentic OS" "Ollama not running. Start: systemctl start ollama"
     fi
 fi
 
 if [ "$HAS_RESULTS" -eq 0 ]; then
-    PAT=$(echo "$QUERY" | grep -oiE '[0-9]+\s*(h|hr|hour|hours|d|day|days)' | head -1 | tr -d ' ')
+    PAT=$(echo "$QUERY" | grep -oiE '[0-9]+\s*(h|hr|hour|hours|d|day|days)' | head -1 | tr -d ' ') || true
     if [ -n "$PAT" ]; then
-        if echo "$PAT" | grep -qiE '[0-9]+\s*(h|hr|hour|hours)'; then
-            H=$(echo "$PAT" | grep -oE '[0-9]+')
-            TIME_ARG="${H}h"
+        if echo "$PAT" | grep -qiE '[0-9]+[hd]'; then
+            TIME_ARG="$PAT"
         else
-            D=$(echo "$PAT" | grep -oE '[0-9]+')
-            TIME_ARG="${D}d"
+            NUM=$(echo "$PAT" | grep -oE '[0-9]+')
+            if echo "$PAT" | grep -qiE 'h|hr|hour|hours'; then
+                TIME_ARG="${NUM}h"
+            else
+                TIME_ARG="${NUM}d"
+            fi
         fi
         if command -v fd &>/dev/null; then
-            fd --changed-within "$TIME_ARG" --type f "$HOME" 2>/dev/null | head -30 > "$RESULTS_FILE" || true
+            fd --changed-within "$TIME_ARG" --type f "$HOME" 2>/dev/null | head -20 > "$RESULTS_FILE" || true
         elif command -v find &>/dev/null; then
             if echo "$TIME_ARG" | grep -q 'h$'; then
                 MINS=$(( ${TIME_ARG%h} * 60 ))
             else
                 MINS=$(( ${TIME_ARG%d} * 1440 ))
             fi
-            find "$HOME" -mmin "-${MINS}" -type f 2>/dev/null | head -30 > "$RESULTS_FILE" || true
+            find "$HOME" -mmin "-${MINS}" -type f 2>/dev/null | head -20 > "$RESULTS_FILE" || true
         fi
         [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
     fi
@@ -221,6 +157,11 @@ fi
 if [ "$HAS_RESULTS" -eq 0 ] && command -v fd &>/dev/null; then
     fd --type f --max-depth 5 "$HOME" 2>/dev/null | head -15 > "$RESULTS_FILE" || true
     [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
+fi
+
+if [ "$HAS_RESULTS" -eq 0 ]; then
+    notify-send -u critical -t 5000 "Agentic OS" "No files found for query"
+    exit 0
 fi
 
 notify-send -t 2000 -r 999 "Agentic OS" "$(wc -l < "$RESULTS_FILE") results ready"
@@ -273,6 +214,9 @@ systemctl --user enable --now lsfs-daemon.service 2>/dev/null && ok "LSFS daemon
 
 # Pin model in VRAM
 curl -X POST http://localhost:11434/api/generate -d '{"model":"nomic-embed-text","keep_alive":-1,"prompt":""}' 2>/dev/null && ok "Model pinned" || warn "Ollama not reachable"
+
+# Run health check + auto-fix
+bash "$ISO_DIR/scripts/fix-all.sh" "$ISO_DIR"
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════╗${NC}"
