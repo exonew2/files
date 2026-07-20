@@ -16,9 +16,19 @@ warn(){ echo -e " ${YELLOW}⚠${NC} $1"; }
 err() { echo -e " ${RED}✗${NC} $1"; }
 sep() { echo -e "${CYAN}──────────────────────────────────────────────────────────────${NC}"; }
 
-ISO_DIR="${1:-$HOME/ash-iso}"
+# Detect real user FIRST
+if [ -n "${SUDO_USER:-}" ]; then
+    REAL_USER="$SUDO_USER"
+    REAL_HOME=$(eval echo "~$SUDO_USER")
+else
+    REAL_USER="${USER:-root}"
+    REAL_HOME="$HOME"
+fi
+
+ISO_DIR="${1:-$REAL_HOME/ash-iso}"
 FORCE="${2:-}"
 REPO="https://github.com/exonew2/files.git"
+REPO_URL="https://github.com/exonew2/files"
 
 # Ensure we have sudo
 if [ "$(id -u)" -ne 0 ]; then
@@ -42,39 +52,39 @@ echo -e "${CYAN}║  Started: $(date)${NC}" | tee -a "$LOGFILE"
 echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}" | tee -a "$LOGFILE"
 echo "" | tee -a "$LOGFILE"
 
-# Detect user
-if [ -n "${SUDO_USER:-}" ]; then
-    REAL_USER="$SUDO_USER"
-    REAL_HOME=$(eval echo "~$SUDO_USER")
-else
-    REAL_USER="${USER:-root}"
-    REAL_HOME="$HOME"
-fi
 export REAL_USER REAL_HOME
 
 # ── Phase 1: Ensure repo is cloned ──────────────────────────────────────────
 sep | tee -a "$LOGFILE"
 info "Phase 1/8: Ensuring ash-iso repo..." | tee -a "$LOGFILE"
 
-if [ ! -d "$ISO_DIR/.git" ]; then
-    info "Cloning $REPO ..." | tee -a "$LOGFILE"
+if [ -d "$ISO_DIR" ] && [ "$(ls -A "$ISO_DIR" 2>/dev/null | head -5)" ]; then
+    info "Found existing directory at $ISO_DIR" | tee -a "$LOGFILE"
+    if [ -d "$ISO_DIR/.git" ]; then
+        info "Updating via git pull..." | tee -a "$LOGFILE"
+        su - "$REAL_USER" -c "cd '$ISO_DIR' && git stash 2>/dev/null; git pull 2>/dev/null; true" 2>> "$LOGFILE" || true
+    fi
+else
+    info "Fetching repo..." | tee -a "$LOGFILE"
     if command -v git &>/dev/null; then
-        su - "$REAL_USER" -c "git clone --depth=1 '$REPO' '$ISO_DIR'" 2>> "$LOGFILE" || {
-            info "Git failed, trying curl..." | tee -a "$LOGFILE"
+        su - "$REAL_USER" -c "git clone --depth=1 '$REPO' '$ISO_DIR'" 2>> "$LOGFILE" && ok "Cloned via git" | tee -a "$LOGFILE" || {
+            info "Git clone failed, using curl..." | tee -a "$LOGFILE"
             mkdir -p "$ISO_DIR"
-            curl -sfL "$REPO/archive/main.tar.gz" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
-            mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR" 2>/dev/null || true
+            curl -sfL "$REPO_URL/archive/main.tar.gz" 2>> "$LOGFILE" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
+            if [ -d "$(dirname "$ISO_DIR")/files-main" ]; then
+                rm -rf "$ISO_DIR"
+                mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR"
+            fi
         }
     else
+        info "Git not found, using curl..." | tee -a "$LOGFILE"
         mkdir -p "$ISO_DIR"
-        curl -sfL "$REPO/archive/main.tar.gz" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
-        mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR" 2>/dev/null || true
+        curl -sfL "$REPO_URL/archive/main.tar.gz" 2>> "$LOGFILE" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
+        if [ -d "$(dirname "$ISO_DIR")/files-main" ]; then
+            rm -rf "$ISO_DIR"
+            mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR"
+        fi
     fi
-fi
-
-if [ -d "$ISO_DIR/.git" ]; then
-    info "Updating repo..." | tee -a "$LOGFILE"
-    su - "$REAL_USER" -c "cd '$ISO_DIR' && git stash && git pull" 2>> "$LOGFILE" || true
 fi
 ok "Repo ready at $ISO_DIR" | tee -a "$LOGFILE"
 
@@ -275,6 +285,138 @@ LSFSHOOK
 chmod +x "$REAL_HOME/.config/scripts/lsfs_launcher_hook.sh"
 chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/scripts/lsfs_launcher_hook.sh"
 ok "Launcher hook deployed (pure bash, zero Python)" | tee -a "$LOGFILE"
+
+# ── LSFS Daemon (Python) — embedded minimal working version ──
+PYDAEMON="$REAL_HOME/.config/scripts/lsfs_daemon.py"
+if [ -f "$PYDAEMON" ]; then
+    ok "Daemon script already exists" | tee -a "$LOGFILE"
+else
+    cat > "$PYDAEMON" << 'PYDAEMON'
+#!/usr/bin/env python3
+"""LSFS Daemon — watches filesystem, indexes into Qdrant via Ollama embeddings."""
+import os, sys, json, time, hashlib, subprocess, signal, logging, asyncio, aiohttp
+from pathlib import Path
+
+HOME = os.environ.get("HOME", "/home/pal")
+OLLAMA = "http://localhost:11434/api/embeddings"
+QDRANT = "http://localhost:6333/collections"
+MODEL = "nomic-embed-text"
+COLLECTION = "apps"
+WATCH = [HOME]
+IGNORE = {".git", "node_modules", "__pycache__", ".cache", ".venv", "venv"}
+EXT_WEIGHTS = {".py":2,".md":2,".txt":1.5,".json":1.5,".yaml":1.5,".toml":1.5,".sh":1.5,".rs":2,".go":2,".js":2,".ts":2,".css":1,".html":1,".desktop":2,".conf":1.5}
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("lsfs")
+
+def ensure_collection():
+    try:
+        r = requests.get(f"{QDRANT}/{COLLECTION}", timeout=5)
+        if r.status_code == 200: return
+    except: pass
+    payload = {
+        "name": COLLECTION,
+        "vectors": {"size": 768, "distance": "Cosine"},
+        "optimizers_config": {"default_segment_number": 8, "memmap_threshold_kb": 51200}
+    }
+    for i in range(5):
+        try:
+            r = requests.put(f"{QDRANT}/{COLLECTION}", json=payload, timeout=10)
+            if r.status_code in (200, 201): log.info("Collection created"); return
+        except: pass
+        time.sleep(2)
+    log.warning("Could not create Qdrant collection")
+
+def embed(text):
+    for i in range(3):
+        try:
+            r = requests.post(OLLAMA, json={"model":MODEL,"prompt":text[:512],"keep_alive":-1}, timeout=30)
+            if r.status_code == 200:
+                data = r.json()
+                if "embedding" in data: return data["embedding"]
+        except: pass
+        time.sleep(2)
+    return None
+
+def index_file(path):
+    if any(p in path for p in IGNORE): return False
+    p = Path(path)
+    if not p.is_file() or p.is_symlink(): return False
+    try:
+        stat = p.stat()
+        if stat.st_size == 0 or stat.st_size > 1024*1024: return False
+        text = p.read_text(errors="replace")[:1024]
+        if not text.strip(): return False
+        vec = embed(text)
+        if not vec: return False
+        pid = hashlib.md5(path.encode()).hexdigest()
+        ext = p.suffix.lower()
+        weight = EXT_WEIGHTS.get(ext, 1.0)
+        payload = {"path": path, "name": p.name, "ext": ext, "mtime": int(stat.st_mtime), "size": stat.st_size, "weight": weight}
+        r = requests.put(f"{QDRANT}/{COLLECTION}/points", json={
+            "points": [{"id": pid, "vector": vec, "payload": payload}]
+        }, timeout=10)
+        return r.status_code in (200, 201)
+    except: return False
+
+def full_scan():
+    log.info("Full scan started")
+    indexed = 0
+    for root, dirs, files in os.walk(HOME):
+        dirs[:] = [d for d in dirs if d not in IGNORE]
+        for f in files:
+            try:
+                if index_file(os.path.join(root, f)): indexed += 1
+            except: pass
+            if indexed % 500 == 0 and indexed > 0:
+                log.info(f"Indexed {indexed} files")
+                import gc; gc.collect()
+    log.info(f"Full scan done: {indexed} files indexed")
+
+def watch_loop():
+    try:
+        import inotify_simple
+        inotify = inotify_simple.INotify()
+        flags = inotify_simple.flags.CREATE | inotify_simple.flags.MODIFY | inotify_simple.flags.MOVED_TO | inotify_simple.flags.DELETE
+        for root, dirs, _ in os.walk(HOME):
+            dirs[:] = [d for d in dirs if d not in IGNORE and not d.startswith(".")]
+            try: inotify.add_watch(root, flags)
+            except: pass
+        log.info("inotify watch active")
+        while True:
+            for event in inotify.read(timeout=1000):
+                path = os.path.join(event.watch.path, event.name)
+                if event.mask & inotify_simple.flags.DELETE:
+                    pid = hashlib.md5(path.encode()).hexdigest()
+                    try: requests.post(f"{QDRANT}/{COLLECTION}/points/delete", json={"points":[pid]}, timeout=5)
+                    except: pass
+                else:
+                    index_file(path)
+    except ImportError:
+        log.info("inotify_simple not available, polling every 60s")
+        known = set()
+        while True:
+            current = set()
+            for root, dirs, files in os.walk(HOME):
+                dirs[:] = [d for d in dirs if d not in IGNORE]
+                for f in files:
+                    fp = os.path.join(root, f)
+                    current.add(fp)
+                    if fp not in known: index_file(fp)
+            known = current
+            time.sleep(60)
+
+if __name__ == "__main__":
+    import requests
+    log.info("Starting LSFS Daemon")
+    ensure_collection()
+    full_scan()
+    watch_loop()
+PYDAEMON
+    chmod +x "$PYDAEMON"
+    chown "$REAL_USER:$REAL_USER" "$PYDAEMON"
+    ok "Embedded daemon script created" | tee -a "$LOGFILE"
+fi
 
 # ── Systemd daemon service ──
 cat > "$REAL_HOME/.config/systemd/user/lsfs-daemon.service" << 'SYSD'
