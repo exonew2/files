@@ -12,7 +12,7 @@ curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-
 
 That's it. The script:
 
-1. Installs Arch Linux base in a VMware VM
+1. Installs Qdrant, Ollama, LSFS daemon, and launcher hook on your existing Arch VM
 2. Installs Ollama + nomic-embed-text model
 3. Installs Qdrant standalone binary
 4. Deploys the LSFS pure-bash launcher hook
