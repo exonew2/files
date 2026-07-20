@@ -15,7 +15,7 @@ const imageUrl = ogImage.startsWith('http') ? ogImage : `${siteUrl}${ogImage}`;
 ---
 
 <!DOCTYPE html>
-<html lang="en" class="light">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -206,24 +206,26 @@ const imageUrl = ogImage.startsWith('http') ? ogImage : `${siteUrl}${ogImage}`;
         </div>
     </footer>
 
-    <dialog id="terminal-modal" class="modal modal-terminal" aria-labelledby="modal-title" aria-describedby="modal-desc">
-        <div class="modal-backdrop" tabindex="-1" aria-hidden="true"></div>
-        <div class="modal-content">
-            <header class="modal-header">
-                <h3 id="modal-title">Interactive Terminal Demo</h3>
-                <div class="modal-scripts">
-                    <button class="btn btn-sm" data-terminal-script="ollama" onclick="openTerminalModal('ollama')">ollama</button>
-                    <button class="btn btn-sm" data-terminal-script="lsfs" onclick="openTerminalModal('lsfs')">lsfs search</button>
-                    <button class="btn btn-sm" data-terminal-script="snapper" onclick="openTerminalModal('snapper')">snapper</button>
-                    <button class="btn btn-sm" data-terminal-script="status" onclick="openTerminalModal('status')">ash status</button>
+    <dialog id="terminal-modal" class="modal" aria-labelledby="modal-title" aria-describedby="modal-desc">
+        <div class="modal-box max-w-3xl">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close demo">&times;</button>
+            </form>
+            <header class="flex items-center justify-between pb-4 border-b border-[var(--border)]">
+                <h3 id="modal-title" class="text-lg font-bold">Interactive Terminal Demo</h3>
+                <div class="flex gap-2 flex-wrap">
+                    <button class="btn btn-sm font-mono text-xs" data-terminal-script="ollama" onclick="openTerminalModal('ollama')">ollama</button>
+                    <button class="btn btn-sm font-mono text-xs" data-terminal-script="lsfs" onclick="openTerminalModal('lsfs')">lsfs search</button>
+                    <button class="btn btn-sm font-mono text-xs" data-terminal-script="snapper" onclick="openTerminalModal('snapper')">snapper</button>
+                    <button class="btn btn-sm font-mono text-xs" data-terminal-script="status" onclick="openTerminalModal('status')">ash status</button>
                 </div>
-                <button class="modal-close" aria-label="Close demo" onclick="closeTerminalModal()">&times;</button>
             </header>
-            <div class="modal-body">
-                <div id="terminal-container"></div>
-                <p id="modal-desc" class="modal-caption">Real terminal output from the ash ISO. Commands execute against the live system.</p>
+            <div class="py-4">
+                <div id="terminal-container" class="min-h-[300px] max-h-[65vh]"></div>
+                <p id="modal-desc" class="mt-3 text-sm text-[var(--text-dim)]">Real terminal output from the ash ISO. Commands execute against the live system.</p>
             </div>
         </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 </body>
 </html>

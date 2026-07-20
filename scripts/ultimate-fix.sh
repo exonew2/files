@@ -58,35 +58,50 @@ export REAL_USER REAL_HOME
 sep | tee -a "$LOGFILE"
 info "Phase 1/8: Ensuring ash-iso repo..." | tee -a "$LOGFILE"
 
-if [ -d "$ISO_DIR" ] && [ "$(ls -A "$ISO_DIR" 2>/dev/null | head -5)" ]; then
-    info "Found existing directory at $ISO_DIR" | tee -a "$LOGFILE"
-    if [ -d "$ISO_DIR/.git" ]; then
-        info "Updating via git pull..." | tee -a "$LOGFILE"
-        su - "$REAL_USER" -c "cd '$ISO_DIR' && git stash 2>/dev/null; git pull 2>/dev/null; true" 2>> "$LOGFILE" || true
-    fi
+# Check: are we already inside the repo?
+if [ -f "scripts/ultimate-fix.sh" ] && [ -f "iso-profile/airootfs/usr/lib/iso/first-boot.sh" ]; then
+    ISO_DIR="$PWD"
+    info "Detected running from within repo: $ISO_DIR" | tee -a "$LOGFILE"
+elif [ -f "$ISO_DIR/scripts/ultimate-fix.sh" ]; then
+    info "Found existing repo at $ISO_DIR" | tee -a "$LOGFILE"
+elif [ -d "$ISO_DIR" ]; then
+    info "Directory exists but may be incomplete at $ISO_DIR" | tee -a "$LOGFILE"
 else
-    info "Fetching repo..." | tee -a "$LOGFILE"
+    info "Repo not found — attempting to fetch..." | tee -a "$LOGFILE"
     if command -v git &>/dev/null; then
         su - "$REAL_USER" -c "git clone --depth=1 '$REPO' '$ISO_DIR'" 2>> "$LOGFILE" && ok "Cloned via git" | tee -a "$LOGFILE" || {
-            info "Git clone failed, using curl..." | tee -a "$LOGFILE"
-            mkdir -p "$ISO_DIR"
-            curl -sfL "$REPO_URL/archive/main.tar.gz" 2>> "$LOGFILE" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
-            if [ -d "$(dirname "$ISO_DIR")/files-main" ]; then
-                rm -rf "$ISO_DIR"
-                mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR"
-            fi
+            info "Git unavailable, checking for existing files..." | tee -a "$LOGFILE"
         }
-    else
-        info "Git not found, using curl..." | tee -a "$LOGFILE"
-        mkdir -p "$ISO_DIR"
-        curl -sfL "$REPO_URL/archive/main.tar.gz" 2>> "$LOGFILE" | tar -xz -C "$(dirname "$ISO_DIR")" 2>> "$LOGFILE"
-        if [ -d "$(dirname "$ISO_DIR")/files-main" ]; then
-            rm -rf "$ISO_DIR"
-            mv "$(dirname "$ISO_DIR")/files-main" "$ISO_DIR"
-        fi
     fi
 fi
-ok "Repo ready at $ISO_DIR" | tee -a "$LOGFILE"
+
+# If we still don't have the key files, try curl archive download
+if [ ! -f "$ISO_DIR/scripts/ultimate-fix.sh" ] && [ ! -f "$ISO_DIR/iso-profile/airootfs/usr/lib/iso/first-boot.sh" ]; then
+    warn "Could not clone repo via git (private repo needs auth). Attempting curl..." | tee -a "$LOGFILE"
+    warn "If curl also fails, the repo may be private. Trying anyway..." | tee -a "$LOGFILE"
+    mkdir -p "$ISO_DIR" 2>/dev/null || true
+    curl -sfL "$REPO_URL/archive/main.tar.gz" -o /tmp/ash-repo.tar.gz 2>> "$LOGFILE" || true
+    if [ -s /tmp/ash-repo.tar.gz ]; then
+        tar -xzf /tmp/ash-repo.tar.gz -C /tmp/ 2>> "$LOGFILE" || true
+        if [ -d /tmp/files-main ]; then
+            rm -rf "$ISO_DIR" 2>/dev/null || true
+            mv /tmp/files-main "$ISO_DIR" 2>/dev/null || true
+        fi
+        rm -f /tmp/ash-repo.tar.gz
+    fi
+fi
+
+# Update git repo if possible
+if [ -d "$ISO_DIR/.git" ]; then
+    info "Updating via git pull..." | tee -a "$LOGFILE"
+    su - "$REAL_USER" -c "cd '$ISO_DIR' && git stash 2>/dev/null; git pull --rebase 2>/dev/null; true" 2>> "$LOGFILE" || true
+fi
+
+if [ -f "$ISO_DIR/scripts/ultimate-fix.sh" ]; then
+    ok "Repo ready at $ISO_DIR" | tee -a "$LOGFILE"
+else
+    warn "Repo may be incomplete — continuing with what we have" | tee -a "$LOGFILE"
+fi
 
 # ── Phase 2: Install system packages ─────────────────────────────────────────
 sep | tee -a "$LOGFILE"
