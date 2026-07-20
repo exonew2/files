@@ -1,85 +1,59 @@
-# Quick Start
+# Quick Start — Deploy on Existing Arch Linux
 
-## 5-Minute Boot
+## Prerequisites
 
-```bash
-# 1. Download (2.3 GB)
-wget https://github.com/ash-linux/ash/releases/latest/download/ash-2025.01.15.iso
+- Arch Linux VM with Hyprland, git, sudo access
+- Arch Linux VM with Hyprland, git, sudo access\*, an
+- Ollama installed and running (`ollama serve` or `systemctl start ollama`)
+- Internet connection for first-time setup
 
-# 2. Verify (REQUIRED)
-sha256sum -c ash-2025.01.15.iso.sha256
-minisign -Vm ash-2025.01.15.iso -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= -x ash-2025.01.15.iso.minisig
-
-# 3. Import to hypervisor
-# VMware: File → New → "Install from disc or image" → Select ISO
-# VirtualBox: New → Arch Linux (64-bit) → 8GB RAM → Storage → Optical Drive → Select ISO
-# Parallels: File → New → "Install from DVD or image file" → Select ISO
-# QEMU: see below
-
-# 4. Boot → Desktop in ~45s → Terminal opens → Code!
-ollama run llama3.1
-```
-
-## QEMU/KVM Quick Commands
+## One-Liner Deploy
 
 ```bash
-# Live boot (no persistence)
-qemu-system-x86_64 \
-  -enable-kvm -cpu host -m 4G -smp 4 \
-  -drive file=ash-2025.01.15.iso,media=cdrom,readonly=on \
-  -boot d -display gtk -serial stdio \
-  -device virtio-net-pci,netdev=net0 \
-  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -device virtio-gpu-pci
-
-# Install to disk (persistent)
-qemu-img create -f qcow2 ash-disk.qcow2 50G
-qemu-system-x86_64 \
-  -enable-kvm -cpu host -m 8G -smp 4 \
-  -drive file=ash-2025.01.15.iso,media=cdrom,readonly=on \
-  -drive file=ash-disk.qcow2,format=qcow2 \
-  -boot d -display gtk \
-  -device virtio-net-pci,netdev=net0 \
-  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -device virtio-gpu-pci
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 ```
 
-## GPU Passthrough
+Idempotent — safe to re-run. Installs:
 
-| Hypervisor | Command / Setting |
-|------------|-------------------|
-| **VMware** | Settings → Display → "Accelerate 3D graphics" + "Use host GPU" |
-| **VirtualBox** | `VBoxManage modifyvm "ash" --gpupassthrough on` |
-| **Parallels** | Hardware → Graphics → "Auto" (Metal on Apple Silicon) |
-| **QEMU/KVM** | `-device vfio-pci,host=XX:XX.X` (requires IOMMU, VFIO) |
+- Qdrant standalone binary from GitHub releases → systemd service on `:6333`
+- LSFS daemon (`~/.config/scripts/lsfs_daemon.py`) → user systemd service
+- Launcher hook (`~/.config/scripts/lsfs_launcher_hook.sh`) → Super+Space
+- VMware clipboard fix (`open-vm-tools` integration)
+- Enables auto-login to Hyprland
 
-Ollama and llama.cpp auto-detect: AMD ROCm, NVIDIA CUDA, Apple Metal.
+## Post-Deploy
 
-## First Boot Checklist
+1. Reboot or restart Hyprland (Super+Shift+Q)
+2. Press **Super+Space** to open the semantic launcher
+3. Type a natural-language query (e.g. `my notes`, `config files`, `python scripts`)
+4. Select a result → opens in Kitty + Neovim (or respective application)
 
-- [ ] Terminal opens automatically
-- [ ] `ollama run llama3.1` works
-- [ ] `ai-model-selector` opens GUI
-- [ ] Qdrant at `http://localhost:6333`
-- [ ] VS Code + Continue extension ready
-- [ ] Snapshots: `snapper list`
+## What to Test
 
-## Persistence
-
-- `/home` = Btrfs subvolume `@home` (survives reboots)
-- `/var/lib/qdrant` = `@qdrant` subvolume (excluded from snapshots)
-- Models in `~/.ollama` persist
-- Weekly auto-update creates pre/post snapshots
+- **Search by concept** — type "TODO lists" or "shell scripts" → returns semantically similar files
+- **Search by time** — type "files from 42h" or "files from 3d" → falls back to `fd`/`find` time-based search
+- **Tail daemon logs** — `journalctl --user -u lsfs-daemon -f` to see real-time indexing
 
 ## Troubleshooting
 
 ```bash
-# Debug logs
-journalctl -u iso-firstboot -u ollama-pull-default -u qdrant -f
+# Qdrant not responding
+sudo systemctl status qdrant
+sudo journalctl -u qdrant --no-pager -n 20
 
-# Collect debug archive
-iso-debug-issue  # creates ~/iso-debug-*.tar.gz
+# Ollama not responding
+systemctl status ollama
+journalctl -u ollama --no-pager -n 20
 
-# Report issue
-iso-report-issue  # opens GitHub with template + attaches logs
+# LSFS daemon not running
+systemctl --user status lsfs-daemon
+journalctl --user -u lsfs-daemon --no-pager -n 20
+
+# Launcher hook missing
+ls -l ~/.config/scripts/lsfs_launcher_hook.sh
+
+# Re-run deploy (idempotent)
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 ```
+
+If the launcher reports "Ollama not running" or "Qdrant not running", verify the respective services and restart them.

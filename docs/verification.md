@@ -1,144 +1,82 @@
-# Verification Guide
+# Verification — Health Checks
 
-## Why Verify?
+## Quick Health Check Table
 
-Every ash ISO release is signed with **4 independent mechanisms**. Verify **all** before booting.
+Run `bash scripts/ultimate-fix-v2.sh` — it prints this table at the end:
 
-| Mechanism | Type | Strength | Speed |
-|-----------|------|----------|-------|
-| SHA256 | Checksum | Basic integrity | Instant |
-| minisign | Ed25519 | Strong, offline, no PKI | <1s |
-| cosign | Keyless + Sigstore | Transparency log, keyless | ~3s |
-| SLSA L3 | Provenance | Build attestation, reproducible | ~5s |
+| Component | Check Command | Expected |
+|-----------|---------------|----------|
+| Qdrant | `curl http://localhost:6333/health` | JSON response, status up |
+| Ollama | `curl http://localhost:11434/api/tags` | JSON with `nomic-embed-text` |
+| LSFS Daemon | `systemctl --user is-active lsfs-daemon` | `active` |
+| Launcher Hook | `test -x ~/.config/scripts/lsfs_launcher_hook.sh` | Executable file exists |
 
-## Quick Verification (All at Once)
+## Individual Checks
 
-```bash
-# Download verify script
-curl -fsSL https://ash.sh/scripts/verify-ash.sh -o verify-ash.sh
-chmod +x verify-ash.sh
-
-# Run (auto-detects version from filename)
-./verify-ash.sh ash-2025.01.15.iso
-```
-
-## Manual Verification
-
-### 1. SHA256 (Basic)
+### Qdrant
 
 ```bash
-# Linux/macOS
-sha256sum ash-2025.01.15.iso
-
-# Windows PowerShell
-Get-FileHash -Algorithm SHA256 ash-2025.01.15.iso
-
-# Compare to:
-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+curl http://localhost:6333/health
 ```
 
-### 2. minisign (Recommended)
+Expected: `{"status":"ok","version":"..."}` or similar health response.
 
 ```bash
-# Install
-# Arch: pacman -S minisign
-# macOS: brew install minisign
-# Linux: curl -fsSL https://minisign.org/install.sh | sh
-
-# Verify
-minisign -Vm ash-2025.01.15.iso \
-  -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= \
-  -x ash-2025.01.15.iso.minisig
-
-# Expected:
-# Signature and comment signature verified
-# Comment: ash-2025.01.15
+# Verify the 'apps' collection exists
+curl http://localhost:6333/collections/apps
 ```
 
-**Why minisign?** Fast, no network, Ed25519, single public key, no PKI complexity.
-
-### 3. cosign (Keyless + Transparency Log)
+### Ollama
 
 ```bash
-# Install
-go install github.com/sigstore/cosign/v2/cmd/cosign@latest
-# Or download from https://github.com/sigstore/cosign/releases
+# Check Ollama is running
+curl http://localhost:11434/api/version
 
-# Verify
-cosign verify-blob \
-  --bundle ash-2025.01.15.iso.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/ash-linux/ash/.github/workflows/release.yml@refs/tags/v*" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ash-2025.01.15.iso
+# Check nomic-embed-text model is available
+curl http://localhost:11434/api/tags | grep nomic-embed-text
 
-# Expected:
-# Verified OK
-# Certificate subject: ...
-# Certificate issuer URL: https://token.actions.githubusercontent.com
-# GitHub Workflow Trigger: push
-# GitHub Workflow Name: Release ISO
-# GitHub Workflow Repository: ash-linux/ash
-# GitHub Workflow Ref: refs/tags/v2025.01.15
-# GitHub Workflow SHA: a1b2c3d4...
+# If missing, pull it
+ollama pull nomic-embed-text
 ```
 
-**Why cosign?** Keyless signing, Sigstore transparency log, GitHub OIDC identity, tamper-evident log.
-
-### 4. SLSA Level 3 Provenance
+### LSFS Daemon
 
 ```bash
-# Install
-go install github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@latest
-
-# Verify
-slsa-verifier verify-artifact \
-  ash-2025.01.15.iso \
-  --provenance-path provenance.intoto.jsonl \
-  --source-uri github.com/ash-linux/ash \
-  --source-tag v2025.01.15 \
-  --builder-id "https://github.com/ash-linux/ash/.github/workflows/build-iso.yml@refs/heads/main"
-
-# Expected:
-# PASSED: Verified SLSA Provenance
-# Build service: GitHub Actions
-# Builder ID matches expected
-# Source matches expected
+systemctl --user status lsfs-daemon
 ```
 
-**Why SLSA?** Proves the artifact was built by the expected workflow from the expected source — supply chain integrity.
-
-## Verify from Mirrors
+Expected: `active (running)`. Check logs with:
 
 ```bash
-# Verify any mirror download
-minisign -Vm ash-2025.01.15.iso \
-  -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= \
-  -x ash-2025.01.15.iso.minisig
+journalctl --user -u lsfs-daemon -f
 ```
 
-The signature file is the same regardless of mirror.
+### Launcher Hook
 
-## Boot Time Verification Reports
+```bash
+# Verify file exists and is executable
+ls -l ~/.config/scripts/lsfs_launcher_hook.sh
 
-Community-reported boot times by platform:
+# Test manually (simulates Super+Space query)
+bash ~/.config/scripts/lsfs_launcher_hook.sh
+```
 
-| Platform | CPU | RAM | Boot Time | GPU |
-|----------|-----|-----|-----------|-----|
-| VMware Fusion | M2 Max | 16GB | 42s | Metal ✅ |
-| VMware Workstation | i7-13700K | 32GB | 48s | NVIDIA ✅ |
-| VirtualBox | Ryzen 7950X | 64GB | 67s | AMD ✅ |
-| Parallels | M3 Pro | 18GB | 44s | Metal ✅ |
-| QEMU/KVM | i9-13900K | 64GB | 38s | NVIDIA ✅ |
+### End-to-End Test
 
-*Data from 2,400+ reports. Submit yours at `/verify#boot-times`.*
+```bash
+# Embed a test string via Ollama
+curl -X POST http://localhost:11434/api/embeddings \
+  -d '{"model":"nomic-embed-text","prompt":"test query"}'
 
-## Verification Checklist
+# Search Qdrant
+curl -X POST http://localhost:6333/collections/apps/points/search \
+  -d '{"vector":[0.0, ... 768 zeros], "limit": 5, "with_payload": true}'
+```
 
-Before booting, confirm all 4 ✅:
+## Fix-All Script
 
-- [ ] `sha256sum -c ash-2025.01.15.iso.sha256` → **OK**
-- [ ] `minisign -Vm ... -P RWQf6LRC... -x ...minisig` → **Signature verified**
-- [ ] `cosign verify-blob --bundle ...cosign.bundle ...` → **Verified OK**
-- [ ] `slsa-verifier verify-artifact ... --provenance-path provenance.intoto.jsonl` → **PASSED**
+```bash
+bash /path/to/ash-iso/scripts/fix-all.sh
+```
 
-If **any** fails: **Delete the ISO. Do not boot. Report at GitHub Issues.**
+Diagnoses and restarts any failed service in the LSFS stack.

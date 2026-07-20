@@ -1,135 +1,85 @@
-# ash
+# Ash-ISO — Agentic Swarm Habitat OS
 
-> **A**rch **S**napshot **H**ypervisor — *Code burns bright. Ash remains clean.*
+> Production-grade Arch Linux VM with semantic file search, vector memory, and an AI-native desktop launcher. Deploy on top of any Arch Linux install in one command.
 
-[![License](https://img.shields.io/github/license/ash-linux/ash?style=flat-square)](LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ash-linux/ash/build-iso.yml?style=flat-square)](https://github.com/ash-linux/ash/actions)
-[![GitHub Release](https://img.shields.io/github/v/release/ash-linux/ash?style=flat-square&label=latest)](https://github.com/ash-linux/ash/releases)
-[![Discord](https://img.shields.io/discord/ash?style=flat-square&label=discord)](https://discord.gg/ash)
-
-**Download the ISO. Boot. Code with AI. No install. No config. No `curl | sh`.**
-
-<div align="center">
-  <img src="./docs/demo.gif" alt="ash demo" width="600" />
-</div>
-
-## Quick Start
+## Quick Deploy
 
 ```bash
-# 1. Download (2.3 GB)
-wget https://github.com/ash-linux/ash/releases/latest/download/ash-2025.01.1.iso
-
-# 2. Verify (REQUIRED)
-sha256sum -c ash-2025.01.1.iso.sha256
-minisign -Vm ash-2025.01.1.iso -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= -x ash-2025.01.1.iso.minisig
-
-# 3. Import & Boot
-# VMware: File → New → "Install from disc or image" → Select ISO
-# VirtualBox: New → Arch Linux (64-bit) → 8GB RAM → 4 CPU → Storage → Optical Drive → Select ISO
-# Parallels: File → New → "Install from DVD or image file" → Select ISO
-
-# 4. Code
-# Desktop loads in ~45s. Terminal opens. Run:
-ollama run llama3.1
-# or
-ai-model-selector  # GUI to pull models
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 ```
 
-## Why ash?
+Idempotent. Safe to re-run. Installs everything below on an existing Arch Linux system.
 
-| Problem | ash Solution |
-|---------|--------------|
-| **AI breaks your system** | Btrfs snapshots — instant rollback. `snapper rollback 42` |
-| **Malicious packages** | nftables firewall + dependency firewall blocks slopsquatting |
-| **No local GPU for AI** | Native GPU passthrough (VMware/VirtualBox/Parallels/QEMU) |
-| **Cloud-only AI tools** | 100% offline: Ollama + llama.cpp + Qdrant vector memory |
-| **Config hell** | Zero config. Boot ISO → desktop → code. |
-| **Supply chain attacks** | SHA256 + minisign + cosign + SLSA Level 3 provenance on every release |
+## What You Get
 
-## Features
-
-- **Instant Rollback** — Btrfs + Snapper: hourly, daily, monthly, pre/post `pacman`
-- **AI-Ready Desktop** — GNOME on Xorg + Hyprland (alt), Ollama, llama.cpp, Continue, Cody
-- **Vector Memory** — Qdrant persists across reboots (excluded from snapshots)
-- **Model Router** — `ai-model-selector` GUI pulls models on demand
-- **GPU Passthrough** — Works out of the box on VMware, VirtualBox, Parallels, QEMU/KVM
-- **Zero Config** — Timezone, keyboard, user, SSH, guest agents — all auto-detected
-- **Verifiable** — Every release: SHA256, minisign, cosign (keyless), SLSA provenance
-- **Delta Updates** — `btrfs send/receive` + `zsync` for 5-30% bandwidth
-
-## Formats Available
-
-| Format | Use Case | Size |
-|--------|----------|------|
-| **ISO (Hybrid BIOS/UEFI)** | All hypervisors, USB, bare metal | 2.3 GB |
-| **VMware OVA** | VMware Fusion/Workstation/ESXi | 2.5 GB |
-| **VirtualBox OVA** | VirtualBox 7+ | 2.5 GB |
-| **Parallels PVM** | Parallels Desktop 18+ (macOS) | 2.5 GB |
-| **QCOW2** | QEMU/KVM, libvirt, Proxmox | 2.3 GB |
-| **VHDX** | Hyper-V | 2.5 GB |
-| **Vagrant Box** | `vagrant init ash-linux/ash` | 2.3 GB |
-| **AWS AMI / GCP Image / Azure VHD** | Cloud deployments | ~3.5 GB |
+| Feature | Description |
+|---------|-------------|
+| **Semantic Search** | Search files by concept using Ollama embeddings + Qdrant vector DB |
+| **Super+Space Launcher** | woofi-based launcher hook — type a concept, get relevant files |
+| **Vector Memory** | Qdrant standalone binary (no AUR, no Docker) persists embeddings across reboots |
+| **LSFS Daemon** | Python-based indexing daemon that watches your project dirs and builds vector embeddings |
+| **Hyprland Desktop** | Wayland compositor with auto-login, auto-start services, and VMware optimizations |
+| **VMware Clipboard** | open-vm-tools with `vmware-user` integrated into Hyprland |
+| **Auto-login** | Boots directly into Hyprland — no display manager, no login prompt |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      ash ISO (Arch Linux)                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   GNOME     │  │  Ollama     │  │  Qdrant     │          │
-│  │  (Xorg)     │  │  + Models   │  │  (Vectors)  │          │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
-│         │                │                │                  │
-│  ┌──────▼────────────────▼────────────────▼──────┐          │
-│  │           Btrfs Subvolumes                     │          │
-│  │  @  @home  @log  @cache  @qdrant  @snapshots   │          │
-│  └────────────────────┬──────────────────────────┘          │
-│                       │                                     │
-│  ┌────────────────────▼──────────────────────────┐          │
-│  │         Linux Namespaces + cgroups v2          │          │
-│  │  (PID, Mount, Net, User, UTS, IPC isolation)  │          │
-│  └────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  Hyprland (Wayland Compositor)                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  Super+Space → woofi (dmenu prompt)              │   │
+│  │       │                                           │   │
+│  │       ▼                                           │   │
+│  │  lsfs_launcher_hook.sh (pure bash)                │   │
+│  │       │                                           │   │
+│  │       ├──→ POST /api/embeddings (Ollama)          │   │
+│  │       │       nomic-embed-text → 768-dim vector   │   │
+│  │       │                                           │   │
+│  │       └──→ POST /collections/apps/points/search   │   │
+│  │               Qdrant (localhost:6333)              │   │
+│  │               │                                    │   │
+│  │               ▼                                    │   │
+│  │         Results piped back to woofi                │   │
+│  │         Selection → hyprctl dispatch exec           │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  Background Services:                                    │
+│    ollama.service      → localhost:11434                 │
+│    qdrant.service      → localhost:6333                  │
+│    lsfs-daemon.service → Python indexer + FUSE mount     │
+│    vmtoolsd.service    → VMware clipboard/sharing        │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Verification
+## Key Improvements
 
-Every release is signed with **three independent mechanisms**:
+- **Pure-bash launcher** — The search hook (`scripts/instant-launcher.sh`) has zero Python dependencies at runtime. Calls Ollama and Qdrant APIs directly via `curl`. No `sentence-transformers`, no `fusepy`, no import overhead.
+- **nomic-embed-text model** — 768-dimensional embeddings, Ollama-native. Small, fast, good-enough for semantic file search. Pulled automatically if missing.
+- **Qdrant standalone binary** — Downloaded directly from `github.com/qdrant/qdrant/releases` as a static musl binary. Runs as a systemd service. No AUR, no Docker, no Python SDK needed.
+- **VMware-first** — `.vmx` workaround (`mks.enableVulkanRenderer = "FALSE"`) eliminates Hyprland tearing/freezing. `open-vm-tools` for bidirectional clipboard.
+- **Auto-start everything** — systemd services for Ollama, Qdrant, LSFS daemon, VMware tools all enabled at boot. Hyprland auto-login via `getty@tty1` override.
+- **Graceful fallback** — If Qdrant is unreachable, the launcher falls back to `fd` / `find` for time-based or name-based file search.
+- **Health check + auto-fix** — `scripts/fix-all.sh` runs a diagnostic on the full stack and restarts any dead service.
 
-```bash
-# 1. SHA256 (basic integrity)
-sha256sum -c ash-2025.01.1.iso.sha256
+## Relevant Files
 
-# 2. minisign (Ed25519, fast, offline verification)
-minisign -Vm ash-2025.01.1.iso -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= -x ash-2025.01.1.iso.minisig
-
-# 3. cosign (keyless, transparency log, SLSA provenance)
-cosign verify-blob \
-  --bundle ash-2025.01.1.iso.cosign.bundle \
-  --certificate-identity-regexp "https://github.com/ash-linux/ash/.github/workflows/release.yml@refs/tags/v*" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ash-2025.01.1.iso
-```
+| File | Purpose |
+|------|---------|
+| `scripts/ultimate-fix-v2.sh` | One-shot deploy script — installs everything |
+| `scripts/instant-launcher.sh` | Pure-bash search hook (Woofi → Ollama → Qdrant) |
+| `scripts/fix-all.sh` | Health check + auto-restart for all services |
+| `scripts/fix-clipboard.sh` | VMware clipboard repair |
+| `scripts/deploy.sh` | Alternative deployment via repo clone |
+| `iso-profile/airootfs/usr/lib/iso/lsfs-setup.sh` | First-boot LSFS setup |
+| `iso-profile/airootfs/usr/lib/iso/qdrant-setup.sh` | First-boot Qdrant installation |
+| `iso-profile/airootfs/usr/lib/ash-launcher/ash-launcher.sh` | Python-backed AI launcher (alternative) |
 
 ## Documentation
 
-- [Quick Start](/docs/quickstart.md)
-- [GPU Passthrough](/docs/gpu-passthrough.md)
-- [Persistence](/docs/persistence.md)
-- [Updates](/docs/updates.md)
-- [Verification](/docs/verification.md)
-- [Comparison](/docs/comparison.md)
-
-## Community
-
-- **GitHub**: [ash-linux/ash](https://github.com/ash-linux/ash) — Issues, PRs, Releases
-- **Discord**: [discord.gg/ash](https://discord.gg/ash) — Support, discussion
-- **Reddit**: [r/ashlinux](https://reddit.com/r/ashlinux) — Community
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
----
-
-**Built for the vibe-coding era.** | [Download Latest](https://github.com/ash-linux/ash/releases/latest) | [Verify](https://ash.sh/verify)
+- [`docs/quickstart.md`](docs/quickstart.md) — VM setup and first boot
+- [`docs/agentic-swarm-setup.md`](docs/agentic-swarm-setup.md) — Full end-to-end deployment guide
+- [`docs/lsfs-optimized-setup.md`](docs/lsfs-optimized-setup.md) — LSFS tuning, VMX config, GPU pinning
+- [`docs/persistence.md`](docs/persistence.md) — Btrfs snapshots and data persistence
+- [`docs/gpu-passthrough.md`](docs/gpu-passthrough.md) — GPU passthrough for hypervisors
+- [`docs/verification.md`](docs/verification.md) — Release signing and integrity

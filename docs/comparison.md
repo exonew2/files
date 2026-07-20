@@ -1,82 +1,69 @@
-# Comparison: ash vs Alternatives
+# Comparison — ash-iso vs Other Approaches
 
 ## Quick Comparison
 
-| Feature | **ash ISO** | Gitpod / Codespaces | Dev Containers | Manual Arch VM |
-|---------|-------------|---------------------|----------------|----------------|
-| **Local / Offline** | ✅ 100% | ❌ Cloud only | ✅ Local | ✅ Local |
-| **Zero Config** | ✅ Boot → Code | ⚠️ Config needed | ⚠️ Dockerfile | ❌ Hours |
-| **GPU / Local AI** | ✅ Native passthrough | ❌ No local GPU | ✅ Via Docker | ⚠️ Manual |
-| **Arch + GNOME** | ✅ Pre-configured | ❌ Ubuntu base | ❌ DIY | ⚠️ Manual |
-| **AI Tools Ready** | ✅ Ollama, llama.cpp, Qdrant, Continue | ❌ Manual | ❌ Manual | ❌ Manual |
-| **Instant Rollback** | ✅ Btrfs + Snapper | ❌ N/A | ❌ N/A | ❌ Manual |
-| **Supply Chain Verify** | ✅ SHA256 + minisign + cosign + SLSA | ❌ Opaque | ⚠️ Docker trust | ✅ Manual |
-| **Boot Time** | **~45s** | 60-120s (cloud start) | 30-60s (build) | Hours |
-| **Cost** | **Free** | $10-50/mo | Free (Docker) | Free (time) |
-| **Persistent Memory** | ✅ Qdrant vectors | ❌ Session only | ❌ Container only | ❌ Manual |
+| Feature | **ash-iso on Arch VM** | Plain Arch Setup | Ubuntu Desktop | ISO-Based AI OS Projects |
+|---------|------------------------|------------------|----------------|--------------------------|
+| **Setup Time** | 1 min (one-liner) | 2–4 hours | 30 min install + manual config | 45s boot |
+| **Semantic Search** | ✅ Built-in (LSFS) | ❌ Manual | ❌ Manual | ⚠️ Often absent |
+| **Vector Memory** | ✅ Qdrant standalone | ❌ None | ❌ None | ⚠️ Varies |
+| **Pure-Bash Launcher** | ✅ curl + wofi only | ❌ None | ❌ None | ❌ Python/JS stack |
+| **One-Liner Deploy** | ✅ `curl \| sudo bash` | ❌ N/A | ❌ N/A | ❌ ISO download |
+| **Local / Offline** | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% |
+| **VMware Optimized** | ✅ VMX fix, clipboard | ❌ Manual | ❌ Manual | ❌ Generic |
+| **Rollback** | ⚠️ Manual backups | ⚠️ Manual backups | ⚠️ Manual snapshots | ✅ Btrfs snapshots |
+| **Customization** | ✅ Full Arch control | ✅ Full Arch control | ❌ Constrained | ⚠️ Fixed filesystem |
+| **GPU Passthrough** | ✅ Ollama auto-detect | ⚠️ Manual | ⚠️ Manual | ✅ Pre-configured |
 
 ## Detailed Comparison
 
-### vs GitHub Codespaces / Gitpod
+### vs Plain Arch Linux Setup
 
-| Aspect | ash | Codespaces / Gitpod |
-|--------|-----|---------------------|
-| **Data Privacy** | 100% local | Code leaves your machine |
-| **Internet Required** | No (after download) | Yes, always |
-| **Latency** | Zero (local) | Network dependent |
-| **GPU Access** | Native passthrough | Limited/None |
-| **Model Privacy** | Local only | Sent to cloud |
-| **Cost** | Free (hardware only) | $10-50/month/seat |
-| **Customization** | Full Arch control | Constrained |
-| **Offline Work** | ✅ Full | ❌ Impossible |
+| Aspect | ash-iso | Plain Arch |
+|--------|---------|------------|
+| Install + Config Time | ~1 minute | 2–4 hours |
+| Semantic File Search | Pre-configured | Manual (none available) |
+| Vector DB | Qdrant binary systemd service | None |
+| AI Launcher | Super+Space → woofi → curl → Qdrant | None |
+| Hyprland Config | Pre-tuned for VMware | Manual |
+| VMware Clipboard | open-vm-tools auto-configured | Manual |
+| Auto-Login | Configured out of the box | Manual |
 
-### vs Dev Containers (VS Code / Docker)
+### vs Ubuntu Desktop
 
-| Aspect | ash | Dev Containers |
-|--------|-----|----------------|
-| **Setup Time** | 45s boot | 30-60s build + config |
-| **Config** | None needed | Dockerfile + devcontainer.json |
-| **Rebuild on Change** | No (live system) | Yes (rebuild container) |
-| **GPU** | Native | Via Docker (extra config) |
-| **Snapshots** | Btrfs instant | Docker commit (slow) |
-| **Host Integration** | VM-level isolation | Process-level |
-| **AI Tools** | Pre-installed | Manual install each rebuild |
+| Aspect | ash-iso | Ubuntu |
+|--------|---------|--------|
+| Package Freshness | Arch (rolling) | Ubuntu (fixed release) |
+| Semantic Search | Native | None (or GNOME Search) |
+| AI Stack Integration | One-command deploy | Manual pip/apt install |
+| Wayland Compositor | Hyprland (pre-configured) | GNOME (generic) |
+| Storage Overhead | Minimal (scripts only) | 5–10 GB base |
 
-### vs Manual Arch VM
+### vs ISO-Based AI OS Projects
 
-| Aspect | ash | Manual Arch |
-|--------|-----|-------------|
-| **Install Time** | 45s (boot ISO) | 2-4 hours |
-| **Config Files** | Pre-done | Manual |
-| **AI Stack** | Pre-installed | Manual each tool |
-| **Desktop** | GNOME + Hyprland ready | Manual |
-| **Snapshots** | Snapper + GRUB-Btrfs | Manual Btrfs/LVM |
-| **Guest Agents** | All enabled | Manual per hypervisor |
-| **GPU Passthrough** | Works OOTB | Manual VFIO/IOMMU |
-| **Updates** | Auto + snapshots | Manual |
+| Aspect | ash-iso | ISO-based projects |
+|--------|---------|--------------------|
+| Deployment | Script on existing Arch | Download + boot ISO |
+| Host Modification | No reinstall needed | Destructive (new VM/partition) |
+| File System | Your existing setup | Btrfs subvolumes, read-only root |
+| Update Model | `git pull && re-run script` | ISO re-download or A/B updates |
+| Snapshot/Rollback | Manual (backup your data) | Built-in (Snapper, Btrfs) |
+| Flexibility | Full control of base system | Opinionated defaults |
 
-## When to Use Each
+## When to Use What
 
-| Use Case | Recommended |
-|----------|-------------|
-| **AI coding, local LLMs, privacy** | **ash ISO** |
-| **Team collaboration, cloud CI/CD** | Codespaces / Gitpod |
-| **Consistent dev env across team** | Dev Containers |
-| **Learning Arch, full control** | Manual Arch VM |
-| **Ephemeral experiments** | **ash ISO** (destroy after) |
-| **Production-like staging** | Dev Containers / Codespaces |
+| Use Case | Recommendation |
+|----------|----------------|
+| Already have Arch + Hyprland, want semantic search | **ash-iso** (one-liner) |
+| Setting up a new VM for AI-assisted development | Arch install + ash-iso |
+| Want zero-config AI OS appliance | ISO-based project |
+| Need maximum customization | Plain Arch + cherry-pick ash-iso scripts |
+| Ephemeral experiments | ash-iso (scratchable VM) |
 
-## The ash Advantage
+## Key Differentiators
 
-> **Download → Boot → Code. No config. No cloud. No `curl \| sh`. No rebuilds. Instant snapshots. Native GPU. Your hardware. Your models. Your rules.**
-
-### Unique ash Features
-
-1. **Btrfs Snapshots + GRUB-Btrfs** — Rollback from boot menu
-2. **Qdrant Vector Memory** — AI remembers across sessions
-3. **Dependency Firewall** — Blocks malicious packages (npm/pip/cargo)
-4. **eBPF Audit Trail** — Every syscall logged
-4. **Model Router** — Auto-selects best model per task
-5. **Multi-Hypervisor** — One ISO, works everywhere
-6. **Supply Chain Security** — 4-way verification
-7. **Zero Config** — Timezone, keyboard, user, SSH, agents all auto
+- **Semantic search** — bash launcher calls Ollama embeddings API, queries Qdrant. No Python in the search path.
+- **nomic-embed-text** — 768-dim, Ollama-native model, small and fast.
+- **Qdrant standalone binary** — no AUR, no Docker, no Python SDK. Static musl binary from GitHub releases.
+- **VMware-first** — VMX workaround for Hyprland stability, open-vm-tools clipboard, auto-login.
+- **One-liner deploy** — idempotent, re-runnable. No ISO download, no hypervisor import.

@@ -1,61 +1,30 @@
-# Contributing to ash
+# Contributing
 
-Thanks for contributing! Here's how to get started.
+## Pull Requests
 
-## Development Setup
+1. Fork the repository at https://github.com/exonew2/files
+2. Create a feature branch: `git checkout -b my-feature`
+3. Make your changes
+4. Run validation:
+   - Shell scripts: `bash -n script.sh`
+   - Python scripts: `python -m py_compile script.py`
+5. Commit with a descriptive message
+6. Push and open a PR against `main`
 
-```bash
-git clone https://github.com/ash-linux/ash
-cd ash
+## Coding Standards
 
-# Build ISO locally (requires Arch Linux or Arch-based host)
-./scripts/build-iso.sh 2025.01.1-dev
-
-# Test boot in QEMU
-qemu-system-x86_64 -enable-kvm -cpu host -m 4G -smp 4 \
-  -drive file=out/ash-2025.01.1-dev.iso,media=cdrom,readonly=on \
-  -boot d -display gtk -serial stdio
-
-# Run tests
-./scripts/test-iso.sh out/ash-2025.01.1-dev.iso
-```
-
-## Project Structure
-
-```
-ash-iso/
-├── .github/workflows/       # CI/CD pipelines
-├── iso-profile/             # mkarchiso profile (the ISO build)
-│   └── airootfs/            # Root filesystem overlay
-├── packer/                  # Packer templates for VM formats
-├── landing-page/            # Astro static site (ash.sh)
-├── scripts/                 # Build, sign, distribute, verify
-└── docs/                    # Documentation
-```
-
-## Guidelines
-
-1. **Fork → Branch → PR** — One feature per PR
-2. **Test before PR** — Run `./scripts/test-iso.sh` on your build
-3. **Follow Arch conventions** — `pacman` packages, systemd units, `/etc` layout
-4. **Update docs** — If user-facing, update `/docs` and landing page
-5. **Sign commits** — `git commit -S` (GPG signed)
+- **Shell scripts**: POSIX sh or Bash; use `set -euo pipefail`; no linters required beyond `bash -n`
+- **Python**: Syntax-clean; no style enforcement beyond `python -m py_compile`
+- **Documentation**: Markdown files in `docs/` and `landing-page/src/content/docs/`
+- **Landing page**: Astro content files with frontmatter (title, description, order)
 
 ## Areas for Contribution
 
-- [ ] Additional AI models in default pull list
-- [ ] More hypervisor guest agent integrations
-- [ ] ARM64 / Apple Silicon support (UTM native)
-- [ ] Accessibility improvements (Orca, high contrast)
-- [ ] Language packs beyond en_US
-- [ ] Documentation translations
-- [ ] CI/CD pipeline improvements
-- [ ] Test coverage expansion
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+- Improving the `ultimate-fix-v2.sh` deployment script
+- Adding VMware-specific optimizations (VMX settings, guest tools)
+- Extending the LSFS pure-bash launcher with new semantic commands
+- Documentation improvements and corrections
 
 ## License
 
-By contributing, you agree your contributions are licensed under MIT.
+By contributing, you agree your contributions are licensed under the same license as the project.

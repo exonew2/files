@@ -1,92 +1,47 @@
-# Data Persistence
+# Persistence — What Survives Reboot
 
-## Btrfs Subvolume Layout
+This project deploys scripts on an existing Arch Linux filesystem. There are no Btrfs subvolumes, no Snapper snapshots, and no special filesystem layout. Persistence is provided by your underlying filesystem.
 
-```
-/ (subvolume @)
-├── /home (subvolume @home)          ← Your code, configs, models
-├── /var/log (subvolume @log)        ← System logs
-├── /var/cache (subvolume @cache)    ← Package cache
-├── /var/lib/qdrant (subvolume @qdrant)  ← Vector DB (excluded from snapshots)
-└── /.snapshots (subvolume @snapshots)   ← Snapper snapshots
-```
+## What Persists
 
-## What Persists Across Reboots
+| Path | Content | Persists Reboot |
+|------|---------|-----------------|
+| `/var/lib/qdrant/` | Qdrant vector database (collections, points, payloads) | ✅ |
+| `~/.ollama/` | Ollama models (nomic-embed-text and any others) | ✅ |
+| `~/.config/scripts/lsfs_launcher_hook.sh` | Bash launcher hook (Super+Space) | ✅ |
+| `~/.config/scripts/lsfs_daemon.py` | Python LSFS indexing daemon | ✅ |
+| `~/.config/systemd/user/lsfs-daemon.service` | User systemd unit for daemon | ✅ |
+| `~/.config/hypr/` | Hyprland configuration | ✅ |
+| `/etc/systemd/system/qdrant.service` | Qdrant systemd service | ✅ |
 
-| Path | Survives Reboot | Survives Snapshot Rollback |
-|------|-----------------|---------------------------|
-| `/home/aiuser/*` | ✅ | ❌ (reverts to snapshot) |
-| `/var/lib/qdrant/*` | ✅ | ✅ (excluded from snapshots) |
-| `/var/lib/ollama/*` | ✅ | ❌ (reverts) |
-| `/etc/*` | ✅ | ❌ (reverts) |
-| `/root/*` | ✅ | ❌ (reverts) |
-| `/usr/*` | ✅ | ❌ (reverts) |
+## What Does NOT Persist
 
-## Snapshot Management
+- **Qdrant in-memory caches** — all indexed data is written to `/var/lib/qdrant/` on disk. No data is lost on clean shutdown.
+- **Ollama model cache** — models stored in `~/.ollama/` persist. First-time `ollama pull` may be needed after wiping `~/.ollama`.
+
+## Backup
 
 ```bash
-# List snapshots
-snapper list
+# Qdrant vector data
+sudo tar -czf qdrant-backup-$(date +%F).tar.gz /var/lib/qdrant
 
-# Create manual snapshot
-sudo snapper create --description "Before risky AI experiment"
+# Ollama models
+tar -czf ollama-backup-$(date +%F).tar.gz ~/.ollama
 
-# Rollback to snapshot #42
-sudo snapper rollback 42
-
-# Delete old snapshots
-sudo snapper delete 10-20
-
-# GUI
-snapper-gui
-```
-
-## Qdrant Persistence
-
-Qdrant data lives in `/var/lib/qdrant` (subvolume `@qdrant`), which is **excluded from Snapper snapshots**. This means:
-
-- Vector memories survive snapshot rollbacks
-- AI remembers context across experiments
-- Collections, points, and payloads persist
-
-```bash
-# Verify Qdrant excluded
-snapper -c root get-config | grep EXCLUDE
-# Should show: EXCLUDE_PATHS="/var/lib/qdrant"
-
-# Backup Qdrant manually
-tar -czf qdrant-backup-$(date +%F).tar.gz /var/lib/qdrant
-```
-
-## Model Persistence
-
-Ollama models stored in `/usr/share/ollama/.ollama/models` (read-only in ISO) and `~/.ollama/models` (writable).
-
-```bash
-# Models pulled at runtime go to ~/.ollama (persists in @home)
-ollama pull llama3.2
-
-# To make models persistent across fresh ISO boots:
-# 1. Pull models in running VM
-# 2. Create snapshot: snapper create --description "Models pulled"
-# 3. Rollback restores models instantly
-```
-
-## Backup Strategy
-
-```bash
-#!/usr/bin/env bash
-# backup.sh — Run from host via SSH
-VM="aiuser@localhost -p 2222"
-
-ssh $VM "sudo snapper create --description 'Pre-backup snapshot'"
-ssh $VM "tar -czf - /home/aiuser /var/lib/qdrant" > "ash-backup-$(date +%F).tar.gz"
-ssh $VM "sudo snapper delete $(snapper list | grep 'Pre-backup' | awk '{print $1}')"
+# Configuration
+tar -czf config-backup-$(date +%F).tar.gz \
+  ~/.config/scripts \
+  ~/.config/systemd/user/lsfs-daemon.service \
+  ~/.config/hypr
 ```
 
 ## Disaster Recovery
 
-1. **Rollback failed experiment**: `snapper rollback <num>` → instant
-2. **Corrupted system**: Boot ISO → `snapper rollback` from GRUB-Btrfs menu
-3. **Lost Qdrant data**: Restore from `@qdrant` subvolume backup
-4. **Complete VM loss**: Re-import ISO → 45s to desktop → restore `/home` from backup
+If the VM is lost or corrupted:
+
+1. Deploy a fresh Arch Linux VM
+2. Run the one-liner: `curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash`
+3. Restore Qdrant data: `sudo tar -xzf qdrant-backup-*.tar.gz -C /`
+4. Restore Ollama models: `tar -xzf ollama-backup-*.tar.gz -C ~`
+5. Restore configs: `tar -xzf config-backup-*.tar.gz -C ~`
+6. Restart services: `sudo systemctl restart qdrant && systemctl --user restart lsfs-daemon`

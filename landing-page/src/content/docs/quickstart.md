@@ -1,89 +1,53 @@
 ---
 title: Quick Start
-description: Boot ash ISO from scratch in 5 minutes — download, verify, configure your hypervisor, and get to the desktop with AI tools.
+description: Deploy an Arch Linux VM with LSFS semantic filesystem, Ollama, and Qdrant using a single curl command.
 order: 1
 ---
 
-## 5-Minute Boot
+## One-Liner Deploy
 
 ```bash
-# 1. Download (2.3 GB)
-wget https://github.com/ash-linux/ash/releases/latest/download/ash-2025.01.15.iso
-
-# 2. Verify (REQUIRED)
-sha256sum -c ash-2025.01.15.iso.sha256
-minisign -Vm ash-2025.01.15.iso -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= -x ash-2025.01.15.iso.minisig
-
-# 3. Import to hypervisor
-# VMware: File → New → "Install from disc or image" → Select ISO
-# VirtualBox: New → Arch Linux (64-bit) → 8GB RAM → Storage → Optical Drive → Select ISO
-# Parallels: File → New → "Install from DVD or image file" → Select ISO
-# QEMU: see below
-
-# 4. Boot → Desktop in ~45s → Terminal opens → Code!
-ollama run llama3.1
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 ```
 
-## QEMU/KVM Quick Commands
+That's it. The script:
+
+1. Installs Arch Linux base in a VMware VM
+2. Installs Ollama + nomic-embed-text model
+3. Installs Qdrant standalone binary
+4. Deploys the LSFS pure-bash launcher hook
+5. Applies VMware-specific fixes (VMX workaround, clipboard, resolution)
+6. Configures auto-login and auto-start on boot
+
+## What You Get
+
+| Component | Description |
+|-----------|-------------|
+| **LSFS** | Semantic filesystem — pure-bash launch helper that resolves queries via Ollama embeddings + Qdrant vector search |
+| **Ollama** | Runs `nomic-embed-text` (768-dim) for embedding generation |
+| **Qdrant** | Standalone binary — vector store for semantic lookups |
+| **VMware** | Fusion/Workstation with optimized VMX config, clipboard, display |
+
+## Verification
+
+After boot:
 
 ```bash
-# Live boot (no persistence)
-qemu-system-x86_64 \
-  -enable-kvm -cpu host -m 4G -smp 4 \
-  -drive file=ash-2025.01.15.iso,media=cdrom,readonly=on \
-  -boot d -display gtk -serial stdio \
-  -device virtio-net-pci,netdev=net0 \
-  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -device virtio-gpu-pci
+# Check services
+systemctl status ollama qdrant
 
-# Install to disk (persistent)
-qemu-img create -f qcow2 ash-disk.qcow2 50G
-qemu-system-x86_64 \
-  -enable-kvm -cpu host -m 8G -smp 4 \
-  -drive file=ash-2025.01.15.iso,media=cdrom,readonly=on \
-  -drive file=ash-disk.qcow2,format=qcow2 \
-  -boot d -display gtk \
-  -device virtio-net-pci,netdev=net0 \
-  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -device virtio-gpu-pci
+# Test embedding
+curl -s http://localhost:11434/api/embeddings -d '{"model": "nomic-embed-text", "prompt": "hello"}'
+
+# Test Qdrant
+curl -s http://localhost:6333/collections
+
+# Run LSFS helper
+lsfs query "find me the networking module"
 ```
 
-## GPU Passthrough
+## Requirements
 
-| Hypervisor | Command / Setting |
-|------------|-------------------|
-| **VMware** | Settings → Display → "Accelerate 3D graphics" + "Use host GPU" |
-| **VirtualBox** | `VBoxManage modifyvm "ash" --gpupassthrough on` |
-| **Parallels** | Hardware → Graphics → "Auto" (Metal on Apple Silicon) |
-| **QEMU/KVM** | `-device vfio-pci,host=XX:XX.X` (requires IOMMU, VFIO) |
-
-Ollama and llama.cpp auto-detect: AMD ROCm, NVIDIA CUDA, Apple Metal.
-
-## First Boot Checklist
-
-- [ ] Terminal opens automatically
-- [ ] `ollama run llama3.1` works
-- [ ] `ai-model-selector` opens GUI
-- [ ] Qdrant at `http://localhost:6333`
-- [ ] VS Code + Continue extension ready
-- [ ] Snapshots: `snapper list`
-
-## Persistence
-
-- `/home` = Btrfs subvolume `@home` (survives reboots)
-- `/var/lib/qdrant` = `@qdrant` subvolume (excluded from snapshots)
-- Models in `~/.ollama` persist
-- Weekly auto-update creates pre/post snapshots
-
-## Troubleshooting
-
-```bash
-# Debug logs
-journalctl -u iso-firstboot -u ollama-pull-default -u qdrant -f
-
-# Collect debug archive
-iso-debug-issue  # creates ~/iso-debug-*.tar.gz
-
-# Report issue
-iso-report-issue  # opens GitHub with template + attaches logs
-```
+- VMware Fusion (macOS) or VMware Workstation (Linux/Windows)
+- 4 GB RAM minimum, 8 GB recommended
+- 20 GB free disk

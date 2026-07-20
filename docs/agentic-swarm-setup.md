@@ -1,605 +1,220 @@
-# Ash Agentic Swarm Habitat — Setup Guide
+# Agentic Swarm — Desktop Integration
 
-*Deploy the full LSFS (Local LLM-Based Semantic File System) with Hyprland, Wofi, Qdrant, and Claude Code on ash-iso.*
+How the agentic desktop environment works on a deployed Arch Linux VMware VM: the window manager, launcher, notifications, clipboard, auto-login, and service orchestration.
 
----
+## Overview
 
-## Part 1: Host Hardware Fix (VMware)
+The deployed system bootstraps into a fully functional desktop with:
 
-Before booting the VM, stabilize the VMware virtual GPU for Wayland:
+- **Hyprland** (Wayland compositor) as the display server
+- **Wofi** as the application launcher and LSFS search UI
+- **SwayNC** as the notification daemon
+- **Waybar** as the status bar
+- **Ollama** + **Qdrant** + **LSFS** running as background services
+- **Auto-login** to Hyprland on boot — no login screen
+- **VMware clipboard** integration for copy/paste between host and guest
 
-1. **Shut down the VM** if running.
-2. On your **host machine**, open the VM's `.vmx` file in a text editor:
-   ```bash
-   # macOS / Linux
-   vim ~/Documents/Virtual\ Machines/ash-iso/ash-iso.vmx
-   ```
-3. **Append** these two lines at the bottom:
-   ```text
-   mks.enableVulkanRenderer = "FALSE"
-   svga.disableFIFO = "TRUE"
-   ```
-4. Save, close, and **boot the VM**.
+## Desktop Environment
 
-> *Why:* VMware's Vulkan renderer causes Hyprland/Wayland to tear, freeze, or show black boxes. Disabling it falls back to the stable SVGA GPU. `LIBGL_ALWAYS_SOFTWARE` (used inside the VM) prevents OpenGL crashes during heavy install operations.
+| Component | Role | Key Binding |
+|-----------|------|-------------|
+| **Hyprland** | Wayland compositor | — |
+| **Wofi** | Application launcher + semantic search UI | Super+D (apps), Super+Space (LSFS search) |
+| **SwayNC** | Notification center / notification daemon | — |
+| **Waybar** | Status bar with workspaces, clock, system tray | — |
 
----
+All components use the **Catppuccin Mocha** theme (dark purple/navy palette, pink accents).
 
-## Part 2: VM-Side Agentic OS Deployment
+### Hyprland config
 
-Boot the VM. At the GNOME/Hyprland desktop, open a CPU-rendered terminal:
+Located at `~/.config/hypr/hyprland.conf`. Key bindings relevant to the agentic setup:
 
-```bash
-LIBGL_ALWAYS_SOFTWARE=true kitty
-```
-
-> This prevents the OpenGL driver from crashing under heavy installation I/O.
-
-Now paste the full script block below. It is idempotent and safe to re-run.
-
-```bash
-#!/usr/bin/env bash
-# =============================================================================
-# Ash Agentic Swarm Habitat — Master Setup Script
-# Transforms ash-iso into a fully vector-aware agentic OS with:
-#   - Wofi (stable Wayland launcher, replaces rofi)
-#   - SwayNC (notification center)
-#   - Qdrant + Ollama (local vector AI memory)
-#   - LSFS (semantic file search engine)
-#   - Claude Code + OpenClaw (AI coding agents)
-# =============================================================================
-set -euo pipefail
-
-# ── Colors ──────────────────────────────────────────────────────────────────
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
-NC='\033[0m'
-ok()  { echo -e " ${GREEN}✓${NC} $1"; }
-info(){ echo -e " ${CYAN}→${NC} $1"; }
-warn(){ echo -e " ${YELLOW}⚠${NC} $1"; }
-err() { echo -e " ${RED}✗${NC} $1"; }
-
-# ── Config ──────────────────────────────────────────────────────────────────
-USER_HOME="$HOME"
-LSFS_SCRIPTS="$HOME/.config/scripts"
-BIN_DIR="$HOME/.local/bin"
-QDRANT_DIR="$HOME/.local/share/qdrant"
-NPM_PREFIX="$HOME/.npm-global"
-
-# ── Step 1: System Package Trades ──────────────────────────────────────────
-info "Step 1: Replacing rofi → wofi, dunst → swaync..."
-sudo pacman -S --needed --noconfirm \
-  wofi swaync jq >/dev/null 2>&1 || true
-
-# Remove rofi/dunst if installed (conflict with wofi/swaync)
-sudo pacman -R --noconfirm rofi dunst 2>/dev/null || true
-
-ok "Packages ready"
-
-# ── Step 2: Fix NPM for global installs (no sudo) ──────────────────────────
-info "Step 2: Configuring NPM prefix..."
-mkdir -p "$NPM_PREFIX"
-npm config set prefix "$NPM_PREFIX" 2>/dev/null || true
-
-# Add to PATH persistently
-if ! grep -q "npm-global" "$HOME/.bash_profile" 2>/dev/null; then
-  echo "export PATH=\"$NPM_PREFIX/bin:\$PATH\"" >> "$HOME/.bash_profile"
-fi
-export PATH="$NPM_PREFIX/bin:$PATH"
-
-ok "NPM prefix set to $NPM_PREFIX"
-
-# ── Step 3: Install AI Coding Agents ────────────────────────────────────────
-info "Step 3: Installing Claude Code & OpenClaw..."
-npm install -g @anthropic-ai/claude-code openclaw 2>/dev/null || warn "npm install failed — try: npm install -g @anthropic-ai/claude-code openclaw"
-ok "AI agents installed (if npm succeeded)"
-
-# ── Step 4: Wofi Config (Catppuccin Mocha) ─────────────────────────────────
-info "Step 4: Configuring Wofi..."
-mkdir -p "$HOME/.config/wofi"
-
-cat > "$HOME/.config/wofi/config" << 'WOFIGO'
-mode=dmenu
-width=600
-height=400
-allow_markup=false
-prompt=Agentic Search
-allow_images=false
-show=drun
-insensitive=true
-filter_rate=100
-WOFIGO
-
-cat > "$HOME/.config/wofi/style.css" << 'WOFICSS'
-window {
-    margin: 0px;
-    border: 3px solid #89b4fa;
-    background-color: #1e1e2e;
-    border-radius: 10px;
-    font-family: "JetBrains Mono", "Noto Sans", sans-serif;
-    font-size: 13px;
-}
-#input {
-    margin: 8px;
-    border: 1px solid #45475a;
-    border-radius: 6px;
-    padding: 6px 10px;
-    color: #cdd6f4;
-    background-color: #313244;
-    font-size: 14px;
-}
-#inner-box { margin: 4px; border: none; background-color: #1e1e2e; }
-#outer-box { margin: 4px; border: none; background-color: #1e1e2e; }
-#scroll { margin: 2px; border: none; background-color: #1e1e2e; }
-#text { margin: 4px 8px; border: none; color: #cdd6f4; }
-#entry {
-    border-radius: 6px;
-    padding: 4px;
-}
-#entry:selected { background-color: #313244; border-radius: 6px; }
-#text:selected { color: #f38ba8; }
-#img { margin-right: 8px; }
-WOFICSS
-
-ok "Woofi configured"
-
-# ── Step 5: SwayNC Config (Notification Center) ────────────────────────────
-info "Step 5: Configuring SwayNC..."
-mkdir -p "$HOME/.config/swaync"
-
-cat > "$HOME/.config/swaync/config.json" << 'SWAYNCCFG'
-{
-  "$schema": "/etc/xdg/swaync/configSchema.json",
-  "positionX": "right",
-  "positionY": "top",
-  "layer": "overlay",
-  "control-center-layer": "top",
-  "layer-shell": true,
-  "cssPriority": "user",
-  "notification-icon-size": 48,
-  "notification-body-image-height": 160,
-  "notification-body-image-width": 200,
-  "timeout": 6,
-  "timeout-low": 4,
-  "timeout-critical": 0,
-  "fit-to-screen": true,
-  "control-center-margin-top": 4,
-  "control-center-margin-bottom": 4,
-  "control-center-margin-right": 4,
-  "control-center-margin-left": 4,
-  "notification-window-width": 380,
-  "keyboard-shortcuts": true,
-  "image-visibility": "when-available",
-  "transition-time": 200,
-  "hide-on-clear": false,
-  "hide-on-action": true,
-  "script-fail-notify": true,
-  "scripts": {
-    "example-script": { "exec": "echo 'swaync notification' >> /tmp/swaync.log", "urgency": "Normal" }
-  }
-}
-SWAYNCCFG
-
-cat > "$HOME/.config/swaync/style.css" << 'SWAYNCSS'
-* {
-  font-family: "JetBrains Mono", "Noto Sans", sans-serif;
-}
-.notification-row { outline: none; }
-.notification-row:focus, .notification-row:hover { background: #313244; }
-.notification {
-  border-radius: 10px;
-  margin: 6px 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-}
-.notification-content { background: transparent; padding: 6px; }
-.close-button {
-  background: #f38ba8;
-  color: #1e1e2e;
-  text-shadow: none;
-  padding: 0 6px;
-  border-radius: 4px;
-  margin: 4px;
-}
-.close-button:hover { background: #f9e2af; }
-.notification-default-action:hover { background: #313244; }
-.summary { color: #89b4fa; font-size: 14px; font-weight: bold; }
-.time { color: #a6adc8; font-size: 11px; }
-.body { color: #cdd6f4; font-size: 13px; }
-.control-center {
-  background: #1e1e2e;
-  border: 1px solid #45475a;
-  border-radius: 12px;
-  margin: 8px;
-  padding: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-}
-.control-center-list { background: transparent; }
-.floating-notifications { background: transparent; }
-.widget-title { color: #cdd6f4; font-size: 16px; font-weight: bold; margin: 8px; }
-.widget-title button { color: #f38ba8; border: none; background: transparent; }
-.widget-label { margin: 8px; }
-.widget-label span { color: #cdd6f4; font-size: 14px; }
-SWAYNCSS
-
-ok "SwayNC configured"
-
-# ── Step 6: Patch Hyprland Config for Wofi + SwayNC ────────────────────────
-info "Step 6: Patching Hyprland config..."
-
-HYPR_CONF="$HOME/.config/hypr/hyprland.conf"
-
-# Replace rofi launchers with wofi
-sed -i 's|rofi -show drun|wofi --show drun|g' "$HYPR_CONF"
-sed -i 's|rofi -show run|wofi --show run|g' "$HYPR_CONF"
-
-# Swap exec-once: dunst → swaync
-sed -i 's|exec-once = dunst|exec-once = swaync|g' "$HYPR_CONF"
-
-# Add LSFS launcher hook for Super+Space if not present
-if ! grep -q "lsfs_launcher_hook" "$HYPR_CONF"; then
-  cat >> "$HYPR_CONF" << 'HYPRPATCH'
-
-# --- Agentic Search (Super+Space → Wofi → LSFS Semantic Query) ---
+```conf
 bind = SUPER, Space, exec, $HOME/.config/scripts/lsfs_launcher_hook.sh
-HYPRPATCH
-fi
-
-# Ensure NPM path is in hyprland env
-if ! grep -q "npm-global" "$HYPR_CONF"; then
-  sed -i '/^env = PATH/a env = PATH,'"$NPM_PREFIX/bin"':\$PATH' "$HYPR_CONF" 2>/dev/null || true
-fi
-
-ok "Hyprland patched"
-
-# ── Step 7: Qdrant Vector Database ─────────────────────────────────────────
-info "Step 7: Deploying Qdrant vector DB..."
-
-# Check if qdrant is available as system package or binary
-if ! command -v qdrant &>/dev/null; then
-  # Download standalone binary
-  mkdir -p "$BIN_DIR"
-  LATEST=$(curl -sI https://github.com/qdrant/qdrant/releases/latest | grep -i location | grep -oP '\d+\.\d+\.\d+' | head -1)
-  curl -sL "https://github.com/qdrant/qdrant/releases/download/v${LATEST}/qdrant-x86_64-unknown-linux-gnu.tar.gz" \
-    | tar -xz -C "$BIN_DIR" 2>/dev/null && \
-  chmod +x "$BIN_DIR/qdrant" || \
-  warn "Qdrant download failed — install manually: https://github.com/qdrant/qdrant/releases"
-fi
-
-mkdir -p "$QDRANT_DIR"
-
-# User systemd service for Qdrant
-mkdir -p "$HOME/.config/systemd/user"
-cat > "$HOME/.config/systemd/user/qdrant.service" << 'QDSRV'
-[Unit]
-Description=Qdrant Vector Database
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=%h/.local/bin/qdrant --storage %h/.local/share/qdrant
-Restart=always
-LimitNOFILE=65536
-
-[Install]
-WantedBy=default.target
-QDSRV
-
-systemctl --user daemon-reload
-systemctl --user enable --now qdrant.service 2>/dev/null || warn "Qdrant user service failed to start"
-
-ok "Qdrant deployed"
-
-# ── Step 8: Ollama + Embedding Model ────────────────────────────────────────
-info "Step 8: Configuring Ollama for embeddings..."
-sudo systemctl enable --now ollama.service 2>/dev/null || true
-
-# Wait for Ollama to be ready
-for i in $(seq 1 10); do
-  if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
-    ok "Ollama ready"
-    break
-  fi
-  sleep 1
-done
-
-# Pull the lightweight embedding model
-ollama pull nomic-embed-text 2>/dev/null || warn "ollama pull failed — run: ollama pull nomic-embed-text"
-ok "Embedding model ready"
-
-# ── Step 9: LSFS Python Semantic Search Engine ─────────────────────────────
-info "Step 9: Deploying LSFS semantic search engine..."
-
-mkdir -p "$LSFS_SCRIPTS"
-
-cat > "$LSFS_SCRIPTS/lsfs_query.py" << 'PYLSFS'
-#!/usr/bin/env python3
-"""
-lsfs_query.py — Local LLM-Based Semantic File System Query Engine.
-Performs hybrid search combining vector embeddings + fuzzy keyword fallback.
-Safe for Wayland environments: uses strict timeouts, no SIGPIPE-prone pipes.
-"""
-import sys, json, subprocess, argparse, urllib.request, urllib.error, time
-
-OLLAMA_URL = "http://localhost:11434/api/embeddings"
-QDRANT_URL = "http://localhost:6333/collections"
-
-def req(url, method="GET", data=None, timeout=1.5):
-    if data is not None:
-        data = json.dumps(data).encode("utf-8")
-    r = urllib.request.Request(url, data=data, method=method)
-    r.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(r, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
-        return {}
-
-def ensure_collection():
-    """Create the 'apps' collection if it doesn't exist."""
-    info = req(f"{QDRANT_URL}/apps", timeout=1.0)
-    if "result" not in info:
-        create = req(f"{QDRANT_URL}", "PUT", {
-            "name": "apps",
-            "vectors": {"size": 768, "distance": "Cosine"}
-        }, timeout=2.0)
-
-def search_semantic(query, limit=3):
-    """Vector search via Ollama embedding + Qdrant."""
-    emb = req(OLLAMA_URL, "POST", {"model": "nomic-embed-text", "prompt": query}, timeout=2.0)
-    embedding = emb.get("embedding")
-    if not embedding:
-        return []
-
-    hits = req(
-        f"{QDRANT_URL}/apps/points/search", "POST",
-        {"vector": embedding, "limit": limit, "with_payload": True},
-        timeout=1.5
-    )
-    results = []
-    for hit in hits.get("result", []):
-        score = hit.get("score", 0)
-        if score > 0.35:
-            payload = hit.get("payload", {})
-            results.append({
-                "path": payload.get("path", ""),
-                "name": payload.get("name", ""),
-                "type": payload.get("type", "file"),
-                "score": score,
-                "method": "semantic"
-            })
-    return results
-
-def search_keyword(query, max_results=5):
-    """Fuzzy keyword fallback using grep — no head/pipe to avoid SIGPIPE."""
-    words = query.lower().split()
-    if not words:
-        return []
-    try:
-        cmd = "find /home/aiuser /etc /usr/share -maxdepth 6 -type f 2>/dev/null"
-        for w in words:
-            cmd += f" | grep -i -- '{w}'"
-        cmd += f" | tail -n {max_results}"
-        output = subprocess.check_output(cmd, shell=True, text=True, timeout=3.0)
-        files = [f.strip() for f in output.splitlines() if f.strip()]
-        return [{"path": f, "name": f.split("/")[-1], "type": "file", "score": 0.5, "method": "keyword"} for f in files[:max_results]]
-    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
-        return []
-
-def index_file(filepath):
-    """Index a single file into Qdrant."""
-    try:
-        with open(filepath, "r", errors="ignore") as f:
-            content = f.read(2048)
-        if not content.strip():
-            return
-        emb = req(OLLAMA_URL, "POST", {"model": "nomic-embed-text", "prompt": content[:1024]}, timeout=2.0)
-        embedding = emb.get("embedding")
-        if not embedding:
-            return
-        req(f"{QDRANT_URL}/apps/points", "PUT", {
-            "points": [{
-                "id": abs(hash(filepath)) % (2**63),
-                "vector": embedding,
-                "payload": {
-                    "path": filepath,
-                    "name": filepath.split("/")[-1],
-                    "type": "file"
-                }
-            }]
-        }, timeout=2.0)
-    except Exception:
-        pass
-
-def scan_and_index(base_path, max_files=50):
-    """Scan a directory and index files."""
-    count = 0
-    for root, dirs, files in os.walk(base_path):
-        if count >= max_files:
-            break
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-        for fname in files:
-            if count >= max_files:
-                break
-            fpath = os.path.join(root, fname)
-            if os.path.isfile(fpath) and not os.path.islink(fpath):
-                index_file(fpath)
-                count += 1
-    return count
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="LSFS Semantic Search")
-    parser.add_argument("--list-mode", type=str, help="Query string to search for")
-    parser.add_argument("--index", type=str, help="Path to index")
-    args = parser.parse_args()
-
-    if args.index:
-        import os
-        ensure_collection()
-        n = scan_and_index(args.index)
-        print(f"Indexed {n} files")
-        sys.exit(0)
-
-    if args.list_mode:
-        ensure_collection()
-        results = search_semantic(args.list_mode)
-        if not results:
-            results = search_keyword(args.list_mode)
-        if not results:
-            print(f"/home/aiuser | No matches for '{args.list_mode}'.")
-        else:
-            for r in results:
-                label = f"{r['path']} | {r['method'].title()}: {r['name']}"
-                if r['method'] == 'semantic':
-                    label += f" ({r['score']:.2f})"
-                print(label)
-        sys.exit(0)
-
-    print("Usage: lsfs_query.py --list-mode <query> | --index <path>")
-PYLSFS
-
-chmod +x "$LSFS_SCRIPTS/lsfs_query.py"
-
-# Create symlink in PATH
-mkdir -p "$BIN_DIR"
-ln -sf "$LSFS_SCRIPTS/lsfs_query.py" "$BIN_DIR/lsfs-query"
-
-ok "LSFS engine deployed"
-
-# ── Step 10: Wofi LSFS Launcher Hook ────────────────────────────────────────
-info "Step 10: Deploying Wofi→LSFS launcher hook..."
-
-cat > "$LSFS_SCRIPTS/lsfs_launcher_hook.sh" << 'LSFSHOOK'
-#!/usr/bin/env bash
-# lsfs_launcher_hook.sh — SUPER+SPACE → Wofi → Semantic File Search
-# Uses --exec-search to prevent empty-list freeze on VMware virtual GPU.
-
-set -euo pipefail
-
-QUERY=$(wofi --dmenu --prompt "Agentic Search" --exec-search --cache-file /dev/null < /dev/null)
-
-if [[ -z "${QUERY:-}" ]]; then
-    exit 0
-fi
-
-# Notify: search in progress (background to not block UI)
-notify-send -t 1500 "Agentic OS" "Searching: $QUERY" &
-
-# Run LSFS query (with timeout to prevent UI hang)
-timeout 5 python3 "$HOME/.config/scripts/lsfs_query.py" --list-mode "$QUERY" > /tmp/lsfs_results.txt 2>/dev/null
-
-# Show results in wofi
-SELECTED=$(wofi --dmenu --prompt "Results" --cache-file /dev/null < /tmp/lsfs_results.txt)
-
-if [[ -z "${SELECTED:-}" ]]; then
-    exit 0
-fi
-
-# Extract path (before the first " | ")
-TARGET_PATH=$(echo "$SELECTED" | sed 's/ | .*//')
-
-if [[ -d "$TARGET_PATH" ]]; then
-    kitty -e yazi "$TARGET_PATH" &
-elif echo "$TARGET_PATH" | grep -q '\.desktop$'; then
-    gtk-launch "$(basename "$TARGET_PATH")" &
-else
-    kitty --class floating_editor -e nvim "$TARGET_PATH" &
-fi
-LSFSHOOK
-
-chmod +x "$LSFS_SCRIPTS/lsfs_launcher_hook.sh"
-
-ok "Launcher hook deployed"
-
-# ── Step 11: Index Home Directory for LSFS ──────────────────────────────────
-info "Step 11: Indexing home directory into Qdrant..."
-python3 "$LSFS_SCRIPTS/lsfs_query.py" --index "$HOME" 2>/dev/null || warn "Initial indexing skipped"
-ok "Indexing complete (if Qdrant was reachable)"
-
-# ── Step 12: Reload Hyprland ────────────────────────────────────────────────
-info "Step 12: Reloading Hyprland..."
-hyprctl reload 2>/dev/null || true
-ok "Hyprland reloaded"
-
-echo ""
-echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║      Ash Agentic Swarm Habitat — Deployment Complete       ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo "  SUPER + Return  → Kitty terminal"
-echo "  SUPER + D       → Wofi (app launcher)"
-echo "  SUPER + Space   → Wofi → LSFS Agentic Search"
-echo "  SUPER + Q       → Close window"
-echo "  SUPER + SHIFT+Q → Exit Hyprland"
-echo ""
-echo "  Qdrant:  http://localhost:6333"
-echo "  Ollama:  http://localhost:11434"
-echo ""
-echo "  To index more files into LSFS:"
-echo "    lsfs-query --index ~/projects"
-echo ""
-echo "  To search from terminal:"
-echo "    lsfs-query --list-mode 'find my notes about arch'"
-echo ""
+bind = SUPER, D, exec, wofi --show drun
+exec-once = swaync
+exec-once = waybar
 ```
 
----
+## VMware Display
 
-## Part 3: Verification
+Wayland on VMware requires a display configuration workaround. Add these lines to the VM's `.vmx` file on the **host** machine:
 
-Test each component:
+```text
+mks.enableVulkanRenderer = "FALSE"
+svga.disableFIFO = "TRUE"
+```
+
+- `mks.enableVulkanRenderer = "FALSE"` — Disables VMware's Vulkan renderer, which causes tearing, black boxes, and freezes in Hyprland/Wayland. Falls back to the SVGA GPU.
+- `svga.disableFIFO = "TRUE"` — Disables the SVGA FIFO to prevent rendering artifacts.
+
+Inside the VM, no special display configuration is needed — Hyprland auto-detects the SVGA device.
+
+## Clipboard
+
+Clipboard sharing between the VMware host and the Arch VM requires two sides:
+
+### Guest side (inside the VM)
+
+`open-vm-tools` provides the clipboard integration:
 
 ```bash
-# Wofi launches
-wofi --show drun
-
-# SwayNC notifications
-notify-send "Test" "Agentic OS notification center works"
-
-# Qdrant is running
-curl http://localhost:6333/dashboard
-
-# Ollama embeddings work
-curl -X POST http://localhost:11434/api/embeddings \
-  -d '{"model":"nomic-embed-text","prompt":"test"}'
-
-# LSFS semantic search
-lsfs-query --list-mode "configuration files"
-
-# Claude Code
-claude --help
-
-# OpenClaw
-openclaw --help
+# Services that must be running:
+systemctl enable --now open-vm-tools.service    # vmtoolsd — main service
+systemctl enable --now vmware-vmblock-fuse.service  # file system block driver
 ```
 
----
+`vmware-user` runs as a user process and handles clipboard synchronization:
 
-## Architecture
+```bash
+/usr/bin/vmware-user  # launched via Hyprland exec-once or xdg-autostart
+```
 
+### Host side (Windows/Linux/macOS)
+
+The VM's `.vmx` file must explicitly enable clipboard operations:
+
+```text
+isolation.tools.copy.disable = "FALSE"
+isolation.tools.paste.disable = "FALSE"
+isolation.tools.setGUIOptions.enable = "TRUE"
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Hyprland WM                       │
-│  ┌────────┐  ┌──────────┐  ┌─────────────────────┐  │
-│  │ Waybar  │  │  SwayNC  │  │  Wofi (Launcher)    │  │
-│  │ (panel) │  │ (notifs) │  │  SUPER+SPACE → LSFS │  │
-│  └────────┘  └──────────┘  └─────────┬───────────┘  │
-│                                       │              │
-│                    ┌──────────────────┴──────┐       │
-│                    │  lsfs_launcher_hook.sh   │       │
-│                    │  (bash wrapper, timeout) │       │
-│                    └──────────┬───────────────┘       │
-│                               │                       │
-│                    ┌──────────┴──────────────┐        │
-│                    │  lsfs_query.py          │        │
-│                    │  (Python hybrid search) │        │
-│                    └──────┬──────────┬───────┘        │
-│                           │          │                │
-│                 ┌─────────┴┐  ┌──────┴───────┐        │
-│                 │  Ollama  │  │   Qdrant     │        │
-│                 │embedding │  │ vector store │        │
-│                 └──────────┘  └──────────────┘        │
-│                                                       │
-│  AI Agents:  Claude Code  ·  OpenClaw                │
-└─────────────────────────────────────────────────────┘
+
+Without these, VMware Workstation/Player blocks clipboard access by default for security.
+
+### Testing
+```bash
+# On the guest, after vmtoolsd is running:
+echo "test" | xclip -selection clipboard
+# Paste on the host — should work if all three .vmx keys are set
 ```
+
+Note: If clipboard stops working after a VM suspend/resume cycle, restart `open-vm-tools`:
+```bash
+sudo systemctl restart open-vm-tools
+```
+
+## Auto-login
+
+The system boots straight to Hyprland without a login prompt. Two methods are supported:
+
+### Method A: SDDM autologin
+```ini
+# /etc/sddm.conf.d/autologin.conf
+[Autologin]
+User=aiuser
+Session=hyprland
+```
+
+### Method B: agetty autologin + .bash_profile
+```bash
+# /etc/systemd/system/getty@tty1.service.d/autologin.conf
+[Service]
+ExecStart=
+ExecStart=-/usr/bin/agetty --autologin aiuser --noclear %I $TERM
+```
+
+The user's `~/.bash_profile` or `~/.bashrc` then execs Hyprland:
+
+```bash
+# ~/.bash_profile (last line)
+if [[ -z "$DISPLAY" ]] && [[ "$(tty)" = "/dev/tty1" ]]; then
+    exec Hyprland
+fi
+```
+
+This avoids a display manager entirely, saving memory and boot time.
+
+## Auto-start
+
+All services start automatically on boot:
+
+### System services
+
+| Service | Purpose | Port | Status |
+|---------|---------|------|--------|
+| `ollama.service` | LLM server for embeddings | `127.0.0.1:11434` | `systemctl status ollama` |
+| `qdrant.service` | Vector database | `127.0.0.1:6333` (TCP), `/tmp/lsfs.sock` (UDS) | `systemctl status qdrant` |
+| `open-vm-tools.service` | VMware guest tools | — | `systemctl status open-vm-tools` |
+| `vmware-vmblock-fuse.service` | VMware file system bridge | — | `systemctl status vmware-vmblock-fuse` |
+
+### User services
+
+| Service | Purpose | Status command |
+|---------|---------|---------------|
+| `lsfs-daemon.service` | File watcher + indexer | `systemctl --user status lsfs-daemon` |
+| `lsfs-parity.timer` | Daily orphan cleanup | `systemctl --user status lsfs-parity.timer` |
+| `lsfs-parity.service` | Oneshot parity check | `systemctl --user status lsfs-parity` |
+
+User services are enabled at boot via `loginctl enable-linger`:
+
+```bash
+loginctl enable-linger aiuser
+```
+
+### Startup order
+
+1. `qdrant.service` starts (depends on `network.target`)
+2. `ollama.service` starts (depends on `network.target`)
+3. `lsfs-daemon.service` starts (depends on both, declared via `After` and `Wants`)
+4. `lsfs-daemon.service` runs an `ExecStartPost` warmup query to prime the Ollama model cache
+5. `lsfs-parity.timer` fires daily, randomized within a 1-hour window
+6. Hyprland auto-starts after agetty/SDDM session login
+7. Hyprland `exec-once` starts `swaync`, `waybar`, `vmware-user`, and binds Super+Space
+
+## Services Summary
+
+| Service | Type | Port(s) | Resource limits | Logs |
+|---------|------|---------|-----------------|------|
+| `ollama.service` | System | `11434` | GPU pinned | `journalctl -u ollama -f` |
+| `qdrant.service` | System | `6333` TCP, `6334` gRPC, `/tmp/lsfs.sock` UDS | `CPUQuota=50%`, `IOWeight=100` | `journalctl -u qdrant -f` |
+| `open-vm-tools.service` | System | — | — | `journalctl -u open-vm-tools -f` |
+| `vmware-vmblock-fuse.service` | System | — | — | `journalctl -u vmware-vmblock-fuse -f` |
+| `lsfs-daemon.service` | User | — | `Nice=19`, `CPUQuota=30%`, `IOSchedulingClass=idle` | `journalctl --user -u lsfs-daemon -f` |
+| `lsfs-parity.timer` | User | — | `Nice=19`, `IOSchedulingClass=idle` | `journalctl --user -u lsfs-parity -f` |
+
+## Troubleshooting
+
+### Hyprland won't start (black screen after boot)
+- Check `~/.local/share/hyprland/hyprland.log` for GPU errors
+- Ensure `.vmx` has `mks.enableVulkanRenderer = "FALSE"` and `svga.disableFIFO = "TRUE"`
+- Boot with `LIBGL_ALWAYS_SOFTWARE=true` in the kernel command line or terminal
+
+### Clipboard not working between host and guest
+```
+sudo systemctl restart open-vm-tools
+sudo systemctl restart vmware-vmblock-fuse
+```
+Then verify `.vmx` contains all three `isolation.tools.*` keys set to `"FALSE"` (the keys are named `.disable`, but `"FALSE"` means "do not disable" — i.e., enable the feature).
+
+### Wofi shows empty list on Super+Space
+- Check that `lsfs_launcher_hook.sh` exists at `~/.config/scripts/` and is executable
+- Test manually: `~/.config/scripts/lsfs_launcher_hook.sh`
+- Check `notify-send` — if notifications appear, the hook is running
+- Verify Qdrant and Ollama: `curl http://localhost:6333/health` and `curl http://localhost:11434/api/tags`
+- The hook uses `--exec-search` flag which prevents empty-list freezes on VMware virtual GPU
+
+### LSFS daemon not indexing
+```
+systemctl --user status lsfs-daemon          # check if running
+journalctl --user -u lsfs-daemon -n 50       # recent logs
+curl http://localhost:6333/collections/apps   # check collection exists
+```
+If the collection is missing, restart the daemon: `systemctl --user restart lsfs-daemon`
+
+### Qdrant won't start
+```
+sudo systemctl status qdrant
+journalctl -u qdrant -n 30
+```
+Common issues:
+- Port `6333` already in use → `sudo lsof -i :6333`
+- Storage directory permissions → `ls -la ~/.local/share/qdrant/`
+- Socket file conflict → `sudo rm -f /tmp/lsfs.sock && sudo systemctl restart qdrant`
+
+### Slow search results
+- Confirm `nomic-embed-text` is loaded: `curl http://localhost:11434/api/tags | jq`
+- Check Ollama is not swapping: `ollama ps`
+- Verify Qdrant WAL is healthy: `curl -s http://localhost:6333/health`
+- Run parity check: `lsfs-parity`
+- Run a full re-index: `systemctl --user start lsfs-reindex`

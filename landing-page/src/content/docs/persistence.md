@@ -1,56 +1,44 @@
 ---
 title: Data Persistence
-description: How data, models, and vector memory persist across reboots in ash using Btrfs subvolumes and Snapper snapshots.
+description: How data, models, and vector store contents persist across VM reboots.
 order: 4
 ---
 
-## Btrfs Subvolume Layout
+## What Persists
 
-```
-/ (subvolume @)
-├── /home (subvolume @home)          ← Your code, configs, models
-├── /var/log (subvolume @log)        ← System logs
-├── /var/cache (subvolume @cache)    ← Package cache
-├── /var/lib/qdrant (subvolume @qdrant)  ← Vector DB (excluded from snapshots)
-└── /.snapshots (subvolume @snapshots)   ← Snapper snapshots
-```
+| Data | Location | Survives Reboot |
+|------|----------|-----------------|
+| Ollama models | `~/.ollama/models` | Yes |
+| Qdrant data | `/var/lib/qdrant` | Yes |
+| LSFS config | `~/.config/lsfs` | Yes |
+| System config | `/etc` | Yes |
+| User home | `/home/*` | Yes |
 
-## What Persists Across Reboots
+Qdrant uses the `storage` directory defined in its config — all vectors, payloads, and collection metadata are written to disk and survive VM restarts.
 
-| Path | Survives Reboot | Survives Snapshot Rollback |
-|------|-----------------|---------------------------|
-| `/home/aiuser/*` | Yes | No |
-| `/var/lib/qdrant/*` | Yes | Yes (excluded from snapshots) |
-
-## Snapshot Management
+## Backup
 
 ```bash
-# List snapshots
-snapper list
+# Backup Qdrant data
+tar -czf qdrant-backup.tar.gz /var/lib/qdrant
 
-# Create manual snapshot
-sudo snapper create --description "Before risky AI experiment"
-
-# Rollback to snapshot #42
-sudo snapper rollback 42
+# Backup Ollama models
+tar -czf ollama-models-backup.tar.gz ~/.ollama/models
 ```
 
-## Qdrant Persistence
+## Restore
 
-Qdrant data in `/var/lib/qdrant` is excluded from Snapper snapshots, so vector memories survive rollbacks.
-
-## Model Persistence
-
-Ollama models stored in `~/.ollama/models` (persists in @home). Models pulled at runtime survive reboots.
-
-## Backup Strategy
+If the VM is rebuilt via the one-liner script, restore data after the first boot:
 
 ```bash
-ssh aiuser@localhost -p 2222 "sudo snapper create --description 'Pre-backup' && tar -czf - /home/aiuser /var/lib/qdrant" > ash-backup.tar.gz
+tar -xzf qdrant-backup.tar.gz -C /
+tar -xzf ollama-models-backup.tar.gz -C ~/
+systemctl restart qdrant ollama
 ```
 
-## Disaster Recovery
+## Snapshot via VMware
 
-1. **Rollback failed experiment**: `snapper rollback <num>`
-2. **Corrupted system**: Boot ISO → rollback from GRUB-Btrfs menu
-3. **Complete VM loss**: Re-import ISO → 45s to desktop → restore `/home`
+For instant rollback, take a VMware snapshot before making changes:
+
+- VM → Snapshot → Take Snapshot
+- Restore via: VM → Snapshot → Go to

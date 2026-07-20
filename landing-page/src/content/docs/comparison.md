@@ -1,39 +1,31 @@
 ---
-title: Comparison — ash vs Alternatives
-description: Compare ash ISO against GitHub Codespaces, Gitpod, Dev Containers, and Manual Arch VM across features, cost, and setup time.
+title: Comparison
+description: How the ash-iso VM deployment compares to manual Arch setup, other VM images, and cloud alternatives.
 order: 6
 ---
 
-## Quick Comparison
+| Feature | **ash-iso VM** | Manual Arch VM | Ubuntu Desktop | Cloud Codespaces |
+|---------|---------------|----------------|----------------|-----------------|
+| **Setup Time** | 1 command | Hours | 15 min | 5 min |
+| **Local / Offline** | Yes | Yes | Yes | No |
+| **LSFS Semantic FS** | Included | Manual | Manual | No |
+| **Ollama + Embeddings** | Pre-configured | Manual | Manual | Possible |
+| **Qdrant Vector Store** | Standalone binary | Manual | Manual | No |
+| **VMware Optimized** | Yes | You build it | Partial | N/A |
+| **Cost** | Free | Free (time) | Free | $10-50/mo |
 
-| Feature | **ash ISO** | Gitpod / Codespaces | Dev Containers | Manual Arch VM |
-|---------|-------------|---------------------|----------------|----------------|
-| **Local / Offline** | 100% | Cloud only | Local | Local |
-| **Zero Config** | Boot → Code | Config needed | Dockerfile | Hours |
-| **GPU / Local AI** | Native passthrough | No local GPU | Via Docker | Manual |
-| **AI Tools Ready** | Ollama, llama.cpp, Qdrant, Continue | Manual | Manual | Manual |
-| **Instant Rollback** | Btrfs + Snapper | N/A | N/A | Manual |
-| **Supply Chain Verify** | SHA256 + minisign + cosign + SLSA | Opaque | Docker trust | Manual |
-| **Boot Time** | **~45s** | 60-120s | 30-60s | Hours |
-| **Cost** | **Free** | $10-50/mo | Free (Docker) | Free (time) |
-
-## When to Use Each
+## When to Use
 
 | Use Case | Recommended |
 |----------|-------------|
-| **AI coding, local LLMs, privacy** | **ash ISO** |
-| **Team collaboration, cloud CI/CD** | Codespaces / Gitpod |
-| **Consistent dev env across team** | Dev Containers |
-| **Learning Arch, full control** | Manual Arch VM |
+| Local AI development with semantic search | **ash-iso VM** |
+| Full control over Arch environment | Manual Arch VM |
+| General-purpose Linux desktop | Ubuntu / Fedora |
+| Team collaboration, cloud CI/CD | Codespaces / Gitpod |
 
-## The ash Advantage
+## Key Differentiators
 
-> **Download → Boot → Code. No config. No cloud. No rebuilds. Instant snapshots. Native GPU. Your hardware. Your models. Your rules.**
-
-### Unique ash Features
-
-1. **Btrfs Snapshots + GRUB-Btrfs** — Rollback from boot menu
-2. **Qdrant Vector Memory** — AI remembers across sessions
-3. **Multi-Hypervisor** — One ISO, works everywhere
-4. **Supply Chain Security** — 4-way verification
-5. **Zero Config** — Timezone, keyboard, user, SSH, agents all auto
+- **Pure-bash LSFS hook** — no Python runtime dependency
+- **nomic-embed-text** — lightweight 768-dim embeddings
+- **Qdrant standalone** — no Docker needed, single binary
+- **VM-only deployment** — no bare-metal install, no dual-boot
