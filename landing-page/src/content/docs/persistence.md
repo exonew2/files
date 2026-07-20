@@ -1,44 +1,51 @@
 ---
 title: Data Persistence
-description: How data, models, and vector store contents persist across VM reboots.
+description: What survives a VM reboot and how to back up / restore your data.
 order: 4
 ---
 
-## What Persists
+## What Survives Reboot
 
-| Data | Location | Survives Reboot |
-|------|----------|-----------------|
-| Ollama models | `~/.ollama/models` | Yes |
-| Qdrant data | `/var/lib/qdrant` | Yes |
-| LSFS config | `~/.config/lsfs` | Yes |
-| System config | `/etc` | Yes |
-| User home | `/home/*` | Yes |
+| Data | Path | Persists |
+|------|------|----------|
+| Qdrant vector store | `/var/lib/qdrant` | Yes |
+| Ollama models + VRAM pin | `~/.ollama` | Yes |
+| LSFS launcher hook | `~/.config/scripts` | Yes |
+| Hyprland config (Catppuccin) | `~/.config/hypr` | Yes |
 
-Qdrant uses the `storage` directory defined in its config — all vectors, payloads, and collection metadata are written to disk and survive VM restarts.
+Qdrant writes all vectors, payloads, and collection metadata to disk. Ollama keeps `nomic-embed-text` in `~/.ollama/models`. The launcher hook at `~/.config/scripts/lsfs_launcher_hook.sh` and Hyprland dotfiles are both under the home directory, which survives reboot.
 
 ## Backup
 
 ```bash
-# Backup Qdrant data
-tar -czf qdrant-backup.tar.gz /var/lib/qdrant
+# Qdrant data
+sudo tar -czf ~/qdrant-backup.tar.gz /var/lib/qdrant
 
-# Backup Ollama models
-tar -czf ollama-models-backup.tar.gz ~/.ollama/models
+# Ollama models
+tar -czf ~/ollama-backup.tar.gz ~/.ollama
+
+# Configs
+tar -czf ~/configs-backup.tar.gz ~/.config/scripts ~/.config/hypr
 ```
 
 ## Restore
 
-If the VM is rebuilt via the one-liner script, restore data after the first boot:
+After a fresh deploy, restore your data:
 
 ```bash
-tar -xzf qdrant-backup.tar.gz -C /
-tar -xzf ollama-models-backup.tar.gz -C ~/
-systemctl restart qdrant ollama
+sudo tar -xzf ~/qdrant-backup.tar.gz -C /
+tar -xzf ~/ollama-backup.tar.gz -C ~/
+tar -xzf ~/configs-backup.tar.gz -C ~/
+sudo systemctl restart qdrant ollama lsfs-daemon
 ```
 
-## Snapshot via VMware
+## Fresh Deploy + Restore Workflow
 
-For instant rollback, take a VMware snapshot before making changes:
+```bash
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
+# then restore from backup
+```
 
-- VM → Snapshot → Take Snapshot
-- Restore via: VM → Snapshot → Go to
+## VMware Snapshot
+
+For instant rollback: VM → Snapshot → Take Snapshot

@@ -8,12 +8,12 @@
 | **Semantic Search** | ✅ Built-in (LSFS) | ❌ Manual | ❌ Manual | ⚠️ Often absent |
 | **Vector Memory** | ✅ Qdrant standalone | ❌ None | ❌ None | ⚠️ Varies |
 | **Pure-Bash Launcher** | ✅ curl + wofi only | ❌ None | ❌ None | ❌ Python/JS stack |
-| **One-Liner Deploy** | ✅ `curl \| sudo bash` | ❌ N/A | ❌ N/A | ❌ ISO download |
+| **One-Liner Deploy** | ✅ `curl | sudo bash` | ❌ N/A | ❌ N/A | ❌ ISO download |
 | **Local / Offline** | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% |
-| **VMware Optimized** | ✅ VMX fix, clipboard | ❌ Manual | ❌ Manual | ❌ Generic |
+| **VMware Optimized** | ⚠️ VMX fix documented, clipboard needs host action | ❌ Manual | ❌ Manual | ❌ Generic |
 | **Rollback** | ⚠️ Manual backups | ⚠️ Manual backups | ⚠️ Manual snapshots | ✅ Btrfs snapshots |
 | **Customization** | ✅ Full Arch control | ✅ Full Arch control | ❌ Constrained | ⚠️ Fixed filesystem |
-| **GPU Passthrough** | ✅ Ollama auto-detect | ⚠️ Manual | ⚠️ Manual | ✅ Pre-configured |
+| **GPU Passthrough** | ⚠️ VMX workaround needed | ⚠️ Manual | ⚠️ Manual | ✅ Pre-configured |
 
 ## Detailed Comparison
 
@@ -24,9 +24,8 @@
 | Install + Config Time | ~1 minute | 2–4 hours |
 | Semantic File Search | Pre-configured | Manual (none available) |
 | Vector DB | Qdrant binary systemd service | None |
-| AI Launcher | Super+Space → woofi → curl → Qdrant | None |
+| AI Launcher | Super+Space → wofi → curl → Qdrant | None |
 | Hyprland Config | Pre-tuned for VMware | Manual |
-| VMware Clipboard | open-vm-tools auto-configured | Manual |
 | Auto-Login | Configured out of the box | Manual |
 
 ### vs Ubuntu Desktop
@@ -46,7 +45,7 @@
 | Deployment | Script on existing Arch | Download + boot ISO |
 | Host Modification | No reinstall needed | Destructive (new VM/partition) |
 | File System | Your existing setup | Btrfs subvolumes, read-only root |
-| Update Model | `git pull && re-run script` | ISO re-download or A/B updates |
+| Update Model | Re-run deploy script | ISO re-download or A/B updates |
 | Snapshot/Rollback | Manual (backup your data) | Built-in (Snapper, Btrfs) |
 | Flexibility | Full control of base system | Opinionated defaults |
 
@@ -63,7 +62,14 @@
 ## Key Differentiators
 
 - **Semantic search** — bash launcher calls Ollama embeddings API, queries Qdrant. No Python in the search path.
-- **nomic-embed-text** — 768-dim, Ollama-native model, small and fast.
+- **nomic-embed-text** — 768-dim, Ollama-native model, small and fast on CPU.
 - **Qdrant standalone binary** — no AUR, no Docker, no Python SDK. Static musl binary from GitHub releases.
-- **VMware-first** — VMX workaround for Hyprland stability, open-vm-tools clipboard, auto-login.
+- **VMware-first** — VMX workaround documented for Hyprland stability, open-vm-tools installed.
 - **One-liner deploy** — idempotent, re-runnable. No ISO download, no hypervisor import.
+
+## Limitations
+
+- **Clipboard**: open-vm-tools installed, but host-side `.vmx` edit required for copy/paste
+- **Display**: VMX workaround (`mks.enableVulkanRenderer = "FALSE"`) needed for Hyprland stability
+- **Index scope**: daemon indexes `~/.config/scripts` by default; other paths must be configured manually
+- **No rollback**: no Btrfs snapshots or A/B update mechanism — backup manually

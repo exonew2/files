@@ -1,8 +1,15 @@
 ---
 title: Quick Start
-description: Deploy an Arch Linux VM with LSFS semantic filesystem, Ollama, and Qdrant using a single curl command.
+description: Deploy LSFS on an existing Arch Linux Hyprland VM with one curl command.
 order: 1
 ---
+
+## Prerequisites
+
+- Arch Linux VMware VM (VMware Fusion on macOS / Workstation on Linux/Windows)
+- Hyprland + Catppuccin Mocha theme
+- Ollama installed with `ollama serve` available
+- `sudo` access
 
 ## One-Liner Deploy
 
@@ -10,44 +17,33 @@ order: 1
 curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 ```
 
-That's it. The script:
+## What the Script Does (8 Phases)
 
-1. Installs Qdrant, Ollama, LSFS daemon, and launcher hook on your existing Arch VM
-2. Installs Ollama + nomic-embed-text model
-3. Installs Qdrant standalone binary
-4. Deploys the LSFS pure-bash launcher hook
-5. Applies VMware-specific fixes (VMX workaround, clipboard, resolution)
-6. Configures auto-login and auto-start on boot
+1. **System prep** — dependencies, directories, permissions
+2. **Qdrant install** — standalone binary + systemd service
+3. **Ollama config** — ensures `nomic-embed-text` is pulled and pinned in VRAM
+4. **LSFS daemon** — Python watcher that indexes files to Qdrant
+5. **Launcher hook** — pure-bash script at `~/.config/scripts/lsfs_launcher_hook.sh` (curl to Ollama API + Qdrant API)
+6. **VMware fixes** — VMX workaround for Hyprland display, clipboard config
+7. **Auto-login** — enables automatic Hyprland session on boot
+8. **Auto-start** — systemd services + wofi launcher on Super+Space
 
-## What You Get
+## Post-Deploy Usage
 
-| Component | Description |
-|-----------|-------------|
-| **LSFS** | Semantic filesystem — pure-bash launch helper that resolves queries via Ollama embeddings + Qdrant vector search |
-| **Ollama** | Runs `nomic-embed-text` (768-dim) for embedding generation |
-| **Qdrant** | Standalone binary — vector store for semantic lookups |
-| **VMware** | Fusion/Workstation with optimized VMX config, clipboard, display |
+- Press **Super+Space** to open **wofi**
+- Search by **concept** (e.g. "config") or **time** (e.g. "42h")
+- The launcher hook queries Ollama embeddings → Qdrant → returns matching files
 
-## Verification
-
-After boot:
+## Troubleshooting
 
 ```bash
-# Check services
-systemctl status ollama qdrant
+# Re-run the deploy (idempotent)
+curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash
 
-# Test embedding
-curl -s http://localhost:11434/api/embeddings -d '{"model": "nomic-embed-text", "prompt": "hello"}'
+# Check individual services
+systemctl status qdrant ollama lsfs-daemon
 
-# Test Qdrant
-curl -s http://localhost:6333/collections
-
-# Run LSFS helper
-lsfs query "find me the networking module"
+# Test embedding pipeline
+curl -s http://localhost:11434/api/embeddings \
+  -d '{"model":"nomic-embed-text","prompt":"hello"}' | jq '.embedding | length'
 ```
-
-## Requirements
-
-- VMware Fusion (macOS) or VMware Workstation (Linux/Windows)
-- 4 GB RAM minimum, 8 GB recommended
-- 20 GB free disk

@@ -1,0 +1,153 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../data/site-config';
+---
+<Layout
+    title={`Deploy Ash-ISO — ${SITE_CONFIG.version}`}
+    description={`One-liner deploy of semantic file search, vector memory, and Hyprland desktop on your Arch Linux VMware VM.`}
+    ogImage="/og-image.svg"
+    ogUrl={`${SITE_CONFIG.siteUrl}/download`}
+>
+
+<section class="page-hero">
+    <div class="container">
+        <h1>Deploy Ash-ISO on Your Arch VM</h1>
+        <p class="lead">One curl pipe bash — semantic filesystem, AI assistant, and Hyprland desktop on any Arch Linux VMware VM.</p>
+
+        <div class="download-primary">
+            <div class="file-info">
+                <span class="version">v{SITE_CONFIG.version} • ~2 minute deploy</span>
+            </div>
+
+            <div class="button-group">
+                <a href={SITE_CONFIG.deployUrl}
+                   class="btn btn-primary btn-lg download-btn"
+                   download="ultimate-fix-v2.sh">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    <span>Download Script</span>
+                </a>
+            </div>
+
+            <pre><code>  curl -fsSL {SITE_CONFIG.deployUrl} | bash</code></pre>
+        </div>
+
+        <section class="section" id="what-it-does">
+            <h2>What the One-Liner Does</h2>
+            <div class="phases-grid">
+                <div class="phase-card"><h3>Phase 1 — System</h3><p>Updates packages, installs curl/jq, creates user <code>ash</code>, locks root password.</p></div>
+                <div class="phase-card"><h3>Phase 2 — Qdrant</h3><p>Pulls Qdrant Docker image, runs container on <code>:6333</code>.</p></div>
+                <div class="phase-card"><h3>Phase 3 — Ollama</h3><p>Installs Ollama system-wide, pulls <code>nomic-embed-text</code> model.</p></div>
+                <div class="phase-card"><h3>Phase 4 — LSFS</h3><p>Installs LSFS semantic filesystem daemon under <code>/opt/lsfs/</code>.</p></div>
+                <div class="phase-card"><h3>Phase 5 — Hyprland</h3><p>Installs Hyprland compositor, Waybar, Rofi, dunst, and essential UI tools.</p></div>
+                <div class="phase-card"><h3>Phase 6 — Launcher</h3><p>Creates <code>rofi-lsfs</code> launcher bound to Super+Space for semantic file search.</p></div>
+                <div class="phase-card"><h3>Phase 7 — Services</h3><p>Enables <code>lsfs-daemon</code> user service and Qdrant Docker restart policy.</p></div>
+                <div class="phase-card"><h3>Phase 8 — Cleanup</h3><p>Removes install script, prints post-install banner with next steps.</p></div>
+            </div>
+        </section>
+
+        <section class="section" id="prerequisites">
+            <h2>Prerequisites</h2>
+            <ul>
+                <li>An Arch Linux VMware VM (recommended) or any Arch Linux system</li>
+                <li>Hyprland compositor (optional but <strong>recommended</strong> for the Super+Space launcher)</li>
+                <li><code>sudo</code> access on the VM</li>
+                <li>Internet connection (for pulling Docker images and models)</li>
+            </ul>
+        </section>
+
+        <section class="section" id="the-command">
+            <h2>The One-Liner</h2>
+            <pre><code>  curl -fsSL {SITE_CONFIG.deployUrl} | bash</code></pre>
+            <p>Run as any user with <code>sudo</code> access. The script handles everything — installation, configuration, and service setup.</p>
+        </section>
+
+        <section class="section" id="post-deploy">
+            <h2>Post-Deploy</h2>
+            <ol>
+                <li><strong>Reboot</strong> the VM to start all services fresh.</li>
+                <li>Log in as <code>ash</code> (password set during Phase 1).</li>
+                <li>Press <strong>Super+Space</strong> to open the semantic file search launcher.</li>
+                <li>Try queries like <code>my notes</code>, <code>files from 42h</code>, or <code>config for ollama</code>.</li>
+            </ol>
+        </section>
+
+        <section class="section" id="troubleshooting">
+            <h2>Troubleshooting</h2>
+            <dl>
+                <dt>Qdrant not running?</dt>
+                <dd><code>sudo docker ps | grep qdrant</code> — check if the container is up. Re-run with <code>sudo docker restart qdrant</code>.</dd>
+                <dt>Ollama unreachable?</dt>
+                <dd><code>systemctl status ollama</code> — ensure the service is active. Check logs with <code>journalctl -u ollama -n 50</code>.</dd>
+                <dt>Launcher not appearing?</dt>
+                <dd>Ensure Hyprland is running. The launcher hook is at <code>/usr/local/bin/launch-lsfs.sh</code> — verify it exists and is executable.</dd>
+                <dt>LSFS daemon failing?</dt>
+                <dd><code>systemctl --user status lsfs-daemon</code> — check the user service status. Logs are in <code>~/.local/state/lsfs/</code>.</dd>
+            </dl>
+            <p>Still stuck? Re-run the <a href={SITE_CONFIG.deployUrl}>one-liner</a> — it is idempotent and safe to re-run.</p>
+        </section>
+    </div>
+</section>
+
+<style>
+  .phases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .phase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+  }
+  .phase-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--brand);
+  }
+  .phase-card p {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .section h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 40px 0 16px;
+    color: var(--text);
+  }
+  .section ul, .section ol {
+    padding-left: 24px;
+    line-height: 1.8;
+    color: var(--text-dim);
+  }
+  .section dl dt {
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .section dl dd {
+    color: var(--text-dim);
+    margin-left: 0;
+    line-height: 1.6;
+  }
+  .section dl dd code {
+    background: var(--bg-code);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .section pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    overflow-x: auto;
+    font-size: 14px;
+  }
+</style>
+
+</Layout>

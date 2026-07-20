@@ -1,0 +1,136 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../data/site-config';
+---
+<Layout
+    title="Health Checks — Verify Your Ash-ISO Stack"
+    description="Check that Qdrant, Ollama, LSFS daemon, and the launcher hook are all running correctly after deploying Ash-ISO."
+    ogImage="/og-image.svg"
+    ogUrl={`${SITE_CONFIG.siteUrl}/verify`}
+>
+
+<section class="page-hero">
+    <div class="container">
+        <h1>Health Checks — Verify Your Ash-ISO Stack</h1>
+        <p class="lead">Every component in the semantic filesystem stack exposes a health endpoint or status command. Run these checks to confirm everything is working.</p>
+
+        <section class="section" id="component-table">
+            <h2>Component Health Overview</h2>
+            <table class="health-table">
+                <thead><tr><th>Component</th><th>Check</th><th>Expected</th></tr></thead>
+                <tbody>
+                    <tr><td>Qdrant</td><td><code>curl :6333/health</code></td><td><code>{ "ok": true }</code></td></tr>
+                    <tr><td>Ollama</td><td><code>curl :11434/api/tags</code></td><td>JSON with <code>nomic-embed-text</code> model</td></tr>
+                    <tr><td>LSFS Daemon</td><td><code>systemctl --user status lsfs-daemon</code></td><td>Active (running)</td></tr>
+                    <tr><td>Launcher Hook</td><td><code>test -x /usr/local/bin/launch-lsfs.sh</code></td><td>Exit code 0</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="section" id="qdrant">
+            <h2>1. Qdrant Vector Database</h2>
+            <p>The semantic search backend. Runs in a Docker container on port <code>:6333</code>.</p>
+            <pre><code>  curl -s http://localhost:6333/health
+  # Expected: {"ok":true}</code></pre>
+            <p>If Qdrant is not running: <code>sudo docker ps -a | grep qdrant</code> to see if the container exists, then <code>sudo docker start qdrant</code>.</p>
+        </section>
+
+        <section class="section" id="ollama">
+            <h2>2. Ollama LLM Runner</h2>
+            <p>Runs the <code>nomic-embed-text</code> model for embeddings. Serves on port <code>:11434</code>.</p>
+            <pre><code>  curl -s http://localhost:11434/api/tags
+  # Expected: JSON object containing a "models" array with "nomic-embed-text:latest"</code></pre>
+            <p>If the model is missing: <code>ollama pull nomic-embed-text</code>. If the service is down: <code>sudo systemctl restart ollama</code>.</p>
+        </section>
+
+        <section class="section" id="lsfs">
+            <h2>3. LSFS Semantic Daemon</h2>
+            <p>The filesystem indexing daemon installed at <code>/opt/lsfs/</code>. Runs as a user service.</p>
+            <pre><code>  systemctl --user status lsfs-daemon
+  # Expected: ● lsfs-daemon.service - LSFS Semantic Filesystem Daemon
+  #            Loaded: loaded
+  #            Active: active (running)</code></pre>
+            <p>If inactive: <code>systemctl --user enable --now lsfs-daemon</code>. Logs are in <code>~/.local/state/lsfs/</code>.</p>
+        </section>
+
+        <section class="section" id="launcher">
+            <h2>4. Rofi Launcher Hook</h2>
+            <p>Bound to Super+Space in Hyprland. A simple shell script that wraps <code>rofi-lsfs</code>.</p>
+            <pre><code>  test -x /usr/local/bin/launch-lsfs.sh && echo "Launcher OK"
+  # Expected: Launcher OK</code></pre>
+            <p>If missing: the install script should have placed it here. Re-run the one-liner to restore it.</p>
+        </section>
+
+        <section class="section" id="e2e">
+            <h2>End-to-End Test</h2>
+            <p>Verify the full pipeline — launcher, LSFS daemon, Ollama, and Qdrant — works together:</p>
+            <pre><code>  # 1. Check LSFS indexes exist
+  ls ~/.local/share/lsfs/indices/
+
+  # 2. Query via the semantic launcher
+  /usr/local/bin/launch-lsfs.sh "test query"
+
+  # 3. Check Qdrant collection count
+  curl -s http://localhost:6333/collections | jq '.result.collections | length'
+
+  # All three should return data without errors.</code></pre>
+        </section>
+
+        <section class="section" id="fix-all">
+            <h2>Fix-All</h2>
+            <p>If any check fails, re-run the deploy script. It is fully idempotent and safe to run multiple times:</p>
+            <pre><code>  curl -fsSL {SITE_CONFIG.deployUrl} | bash</code></pre>
+            <p>This will re-install any missing components, restart services, and leave working configurations intact.</p>
+        </section>
+    </div>
+</section>
+
+<style>
+  .health-table {
+    width: 100%;
+    max-width: 800px;
+    border-collapse: collapse;
+    margin: 24px 0;
+  }
+  .health-table th, .health-table td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .health-table th {
+    font-weight: 700;
+    color: var(--text);
+    background: var(--bg-card);
+  }
+  .health-table td {
+    color: var(--text-dim);
+  }
+  .health-table code {
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .section h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 40px 0 16px;
+    color: var(--text);
+  }
+  .section p {
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .section pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    overflow-x: auto;
+    font-size: 14px;
+  }
+</style>
+
+</Layout>

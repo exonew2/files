@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ash.sh/sitemap-index.xml

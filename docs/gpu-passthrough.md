@@ -1,51 +1,40 @@
-# GPU Passthrough — VMware
+# GPU in VMware
 
 ## VMware Display Settings
 
-In VMware Fusion / Workstation:
+In VMware Workstation / Fusion:
 
 - VM Settings → Display → **"Accelerate 3D graphics"** ✓
-- Allocate at least 4 GB video memory (more if running larger models)
+- Allocate at least 4 GB video memory
 - Set number of CPU cores to 4+
 
 ## VMX Workaround (Hyprland Stability)
 
-If Hyprland experiences tearing, freezing, or crashes on Wayland, add these lines to the `.vmx` file:
+Hyprland on VMware requires a display workaround. Add to the VM's `.vmx` file on the **host**:
 
 ```
 mks.enableVulkanRenderer = "FALSE"
 svga.disableFIFO = "TRUE"
 ```
 
-These disable the Vulkan renderer and FIFO buffer that sometimes conflict with Hyprland. Reboot the VM after editing `.vmx`.
+`mks.enableVulkanRenderer = "FALSE"` disables VMware's Vulkan renderer, which causes tearing, black boxes, and freezes in Hyprland/Wayland. Falls back to the SVGA GPU.
+
+`svga.disableFIFO = "TRUE"` prevents rendering artifacts.
+
+**Status**: Requires host-side action — edit `.vmx` on the Windows/macOS host. Reboot VM after editing.
 
 ## Ollama GPU Detection
 
-Ollama auto-detects available GPU acceleration:
-
-- **NVIDIA (CUDA)** — detected automatically if `nvidia-smi` works
-- **AMD (ROCm)** — detected on supported GPUs
-- **Apple Metal** — used on macOS hosts (VMware Fusion)
-
-No manual configuration is needed. Verify with:
-
-```bash
-curl http://localhost:11434/api/tags
-ollama run nomic-embed-text 2>&1 | grep -i gpu
-```
+Ollama auto-detects available GPU acceleration (NVIDIA CUDA, AMD ROCm, Apple Metal). No manual configuration needed.
 
 ## Model Considerations
 
-| Model | Dimensions | GPU Benefit |
-|-------|------------|-------------|
-| nomic-embed-text | 768 | Minor (runs well on CPU) |
-
-`nomic-embed-text` is lightweight and runs adequately on CPU. GPU acceleration provides a modest speedup for batch embedding but is not required.
+`nomic-embed-text` is lightweight and runs adequately on CPU. GPU acceleration provides modest speedup for batch embedding but is not required.
 
 ## Verification
 
 ```bash
-# Check if Ollama sees GPU
+# Check Ollama version
 curl http://localhost:11434/api/version
 
 # Benchmark embedding speed

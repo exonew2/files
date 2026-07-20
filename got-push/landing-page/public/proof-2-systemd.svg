@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" width="400" height="225">
+  <rect width="400" height="225" fill="#0d1117"/>
+  
+  <!-- Kernel line -->
+  <text x="8" y="14" font-family="monospace" font-size="8" fill="#888">[    0.000000] Linux version 6.8.2-arch1-1</text>
+  <text x="8" y="25" font-family="monospace" font-size="8" fill="#888">[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-linux</text>
+  <text x="8" y="36" font-family="monospace" font-size="8" fill="#555">[    0.324510] ACPI: RSDP 0x000000007F8E0000</text>
+  <text x="8" y="47" font-family="monospace" font-size="8" fill="#555">[    0.891233] PCI: Using host bridge windows</text>
+  <text x="8" y="58" font-family="monospace" font-size="8" fill="#555">[    1.203411] clocksource: tsc acrivate</text>
+  
+  <text x="8" y="72" font-family="monospace" font-size="8" fill="#888" font-weight="bold">         Starting ash-initrd.service...</text>
+  
+  <!-- systemd OK messages -->
+  <text x="8" y="86" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="86" font-family="monospace" font-size="8" fill="#bbb">Loaded initial RAM disk</text>
+  
+  <text x="8" y="97" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="97" font-family="monospace" font-size="8" fill="#bbb">Reached target Local File Systems</text>
+  
+  <text x="8" y="108" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="108" font-family="monospace" font-size="8" fill="#bbb">Started udev Kernel Device Manager</text>
+  
+  <text x="8" y="119" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="119" font-family="monospace" font-size="8" fill="#bbb">Started Network Manager</text>
+  
+  <text x="8" y="130" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="130" font-family="monospace" font-size="8" fill="#bbb">Reached target Network</text>
+  
+  <text x="8" y="141" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="141" font-family="monospace" font-size="8" fill="#bbb">Started PipeWire Multimedia Service</text>
+  
+  <text x="8" y="152" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="152" font-family="monospace" font-size="8" fill="#bbb">Started User Login Management</text>
+  
+  <text x="8" y="163" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="163" font-family="monospace" font-size="8" fill="#bbb">Started Accounts Service</text>
+  
+  <text x="8" y="174" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+  <text x="48" y="174" font-family="monospace" font-size="8" fill="#bbb">Reached target Graphical Interface</text>
+  
+  <!-- Final highlighted line -->
+  <text x="8" y="188" font-family="monospace" font-size="8" fill="#0d0" font-weight="bold">[  OK  ]</text>
+  <text x="48" y="188" font-family="monospace" font-size="8" fill="#0d0" font-weight="bold">Started GNOME Display Manager</text>
+  
+  <!-- Blinking cursor -->
+  <rect x="8" y="198" width="6" height="10" fill="#0d0" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;0;0.8" dur="1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Bottom branding -->
+  <text x="200" y="218" text-anchor="middle" font-family="monospace" font-size="8" fill="#333">ash v0.1.0 — Arch Linux 6.8.2</text>
+</svg>

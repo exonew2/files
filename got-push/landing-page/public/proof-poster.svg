@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#010409"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.3)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.7)"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  
+  <!-- Screenshot montage background (subtle grid) -->
+  <pattern id="grid" patternUnits="userSpaceOnUse" width="40" height="40">
+    <rect width="40" height="40" fill="none"/>
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a1a2e" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1280" height="720" fill="url(#grid)"/>
+  
+  <!-- Fake screenshot thumbnails (mosaic) -->
+  
+  <!-- Thumb 1: GRUB -->
+  <g transform="translate(60, 40)">
+    <rect width="380" height="214" rx="6" fill="#0a0a0a" stroke="#2a2a3a" stroke-width="1"/>
+    <rect x="0" y="0" width="380" height="22" rx="6" fill="#1a1a2e"/>
+    <rect x="0" y="16" width="380" height="6" fill="#1a1a2e"/>
+    <text x="190" y="15" text-anchor="middle" font-family="monospace" font-size="10" fill="#888" font-weight="bold">GNU GRUB version 2.06</text>
+    <rect x="28" y="34" width="324" height="20" rx="3" fill="#0d7377"/>
+    <text x="44" y="48" font-family="monospace" font-size="12" fill="#fff" font-weight="bold">› ash</text>
+    <text x="240" y="48" font-family="monospace" font-size="9" fill="#a0e6e8">default</text>
+    <rect x="28" y="56" width="324" height="18" rx="3" fill="transparent"/>
+    <text x="44" y="69" font-family="monospace" font-size="12" fill="#bbb">  Arch Linux (linux-zen)</text>
+    <rect x="28" y="76" width="324" height="18" rx="3" fill="transparent"/>
+    <text x="44" y="89" font-family="monospace" font-size="12" fill="#bbb">  Arch Linux (linux-lts)</text>
+    <rect x="28" y="96" width="324" height="18" rx="3" fill="transparent"/>
+    <text x="44" y="109" font-family="monospace" font-size="12" fill="#666">  Advanced options</text>
+    <text x="12" y="200" font-family="monospace" font-size="8" fill="#444">Use ↑↓ to highlight, Enter to boot</text>
+  </g>
+  
+  <!-- Thumb 2: systemd -->
+  <g transform="translate(460, 40)">
+    <rect width="380" height="214" rx="6" fill="#0d1117" stroke="#2a2a3a" stroke-width="1"/>
+    <text x="12" y="18" font-family="monospace" font-size="8" fill="#888">[    0.000000] Linux version 6.8.2</text>
+    <text x="12" y="30" font-family="monospace" font-size="8" fill="#555">[    0.324510] ACPI: RSDP 0x0000</text>
+    <text x="12" y="42" font-family="monospace" font-size="8" fill="#555">[    0.891233] PCI: Using host</text>
+    <text x="12" y="57" font-family="monospace" font-size="8" fill="#888" font-weight="bold">         Starting ash-initrd...</text>
+    <text x="12" y="70" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+    <text x="48" y="70" font-family="monospace" font-size="8" fill="#bbb">Loaded initial RAM disk</text>
+    <text x="12" y="82" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+    <text x="48" y="82" font-family="monospace" font-size="8" fill="#bbb">Reached target Local FS</text>
+    <text x="12" y="94" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+    <text x="48" y="94" font-family="monospace" font-size="8" fill="#bbb">Started Network Manager</text>
+    <text x="12" y="106" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+    <text x="48" y="106" font-family="monospace" font-size="8" fill="#bbb">Started PipeWire</text>
+    <text x="12" y="118" font-family="monospace" font-size="8" fill="#0d0">[  OK  ]</text>
+    <text x="48" y="118" font-family="monospace" font-size="8" fill="#bbb">Started GDM</text>
+    <text x="12" y="133" font-family="monospace" font-size="8" fill="#0d0" font-weight="bold">[  OK  ]</text>
+    <text x="48" y="133" font-family="monospace" font-size="8" fill="#0d0" font-weight="bold">Started GNOME Display Manager</text>
+    <rect x="12" y="142" width="6" height="9" fill="#0d0" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0;0.8" dur="1s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  
+  <!-- Thumb 3: GNOME Desktop -->
+  <g transform="translate(60, 270)">
+    <rect width="380" height="214" rx="6" fill="#fafafa" stroke="#ccc" stroke-width="1"/>
+    <rect x="0" y="0" width="380" height="22" rx="6" fill="#1a1a2e"/>
+    <rect x="0" y="16" width="380" height="6" fill="#1a1a2e"/>
+    <text x="190" y="15" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#ddd">Thu Jul 17  14:23</text>
+    <rect x="10" y="28" width="178" height="130" rx="5" fill="#1e1e2e"/>
+    <rect x="10" y="28" width="178" height="22" rx="5" fill="#2d2d44"/>
+    <circle cx="22" cy="39" r="3.5" fill="#ff5f57"/>
+    <circle cx="34" cy="39" r="3.5" fill="#febc2e"/>
+    <circle cx="46" cy="39" r="3.5" fill="#28c840"/>
+    <text x="99" y="42" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#bbb">ash@ash:~</text>
+    <text x="18" y="56" font-family="monospace" font-size="7" fill="#0d0">$</text>
+    <text x="26" y="56" font-family="monospace" font-size="7" fill="#cdd6f4">ash --version</text>
+    <text x="18" y="66" font-family="monospace" font-size="7" fill="#89b4fa">ash v0.1.0</text>
+    <text x="18" y="76" font-family="monospace" font-size="7" fill="#0d0">$</text>
+    <text x="26" y="76" font-family="monospace" font-size="7" fill="#cdd6f4">sudo pacman -Syu</text>
+    <text x="18" y="88" font-family="monospace" font-size="7" fill="#94e2d5">resolving dependencies...</text>
+    <text x="18" y="98" font-family="monospace" font-size="7" fill="#89b4fa">Packages (3): linux</text>
+    <rect x="192" y="28" width="178" height="145" rx="5" fill="#1e1e2e"/>
+    <rect x="192" y="28" width="178" height="22" rx="5" fill="#2d2d44"/>
+    <circle cx="204" cy="39" r="3.5" fill="#ff5f57"/>
+    <circle cx="216" cy="39" r="3.5" fill="#febc2e"/>
+    <circle cx="228" cy="39" r="3.5" fill="#28c840"/>
+    <rect x="192" y="50" width="30" height="123" fill="#181825"/>
+    <text x="228" y="58" font-family="monospace" font-size="6" fill="#6c7086">└─ src/</text>
+    <text x="228" y="68" font-family="monospace" font-size="6" fill="#cba6f7">import</text>
+    <text x="248" y="68" font-family="monospace" font-size="6" fill="#cdd6f4">{ define }</text>
+    <text x="228" y="78" font-family="monospace" font-size="6" fill="#f38ba8">import</text>
+    <text x="238" y="78" font-family="monospace" font-size="6" fill="#cdd6f4">{ useStore }</text>
+    <text x="228" y="88" font-family="monospace" font-size="6" fill="#6c7086">const</text>
+    <text x="238" y="88" font-family="monospace" font-size="6" fill="#f9e2af">Greeting</text>
+    <text x="228" y="98" font-family="monospace" font-size="6" fill="#cdd6f4">  return (</text>
+    <text x="228" y="108" font-family="monospace" font-size="6" fill="#0d7377">&lt;div</text>
+    <text x="240" y="108" font-family="monospace" font-size="6" fill="#cdd6f4"> className</text>
+    <rect x="120" y="185" width="140" height="24" rx="4" fill="rgba(0,0,0,0.08)"/>
+    <rect x="130" y="189" width="16" height="16" rx="2" fill="#0d7377"/>
+    <rect x="152" y="189" width="16" height="16" rx="2" fill="#555"/>
+    <rect x="174" y="189" width="16" height="16" rx="2" fill="#555"/>
+    <rect x="196" y="189" width="16" height="16" rx="2" fill="#555"/>
+    <rect x="218" y="189" width="16" height="16" rx="2" fill="#555"/>
+  </g>
+  
+  <!-- Thumb 4: Qdrant -->
+  <g transform="translate(460, 270)">
+    <rect width="380" height="214" rx="6" fill="#111118" stroke="#2a2a3a" stroke-width="1"/>
+    <rect x="0" y="0" width="380" height="26" rx="6" fill="#1a1a24"/>
+    <rect x="0" y="20" width="380" height="6" fill="#1a1a24"/>
+    <circle cx="12" cy="13" r="4" fill="#ff5f57"/>
+    <circle cx="26" cy="13" r="4" fill="#febc2e"/>
+    <circle cx="40" cy="13" r="4" fill="#28c840"/>
+    <rect x="60" y="6" width="260" height="15" rx="7" fill="#2a2a3a"/>
+    <text x="190" y="17" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#888">localhost:6333/dashboard</text>
+    <rect x="0" y="26" width="380" height="30" fill="#16161f"/>
+    <text x="190" y="45" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#0d7377" font-weight="bold">Qdrant</text>
+    <rect x="10" y="62" width="85" height="44" rx="4" fill="#1e1e2e" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="52" y="76" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#666">Collections</text>
+    <text x="52" y="96" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#0d7377" font-weight="bold">3</text>
+    <rect x="101" y="62" width="85" height="44" rx="4" fill="#1e1e2e" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="143" y="76" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#666">Vectors</text>
+    <text x="143" y="96" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#0d7377" font-weight="bold">12.4K</text>
+    <rect x="192" y="62" width="85" height="44" rx="4" fill="#1e1e2e" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="234" y="76" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#666">Payload</text>
+    <text x="234" y="96" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#0d7377" font-weight="bold">89 MB</text>
+    <rect x="283" y="62" width="87" height="44" rx="4" fill="#1e1e2e" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="326" y="76" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#666">Status</text>
+    <text x="326" y="96" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0d0" font-weight="bold">● Online</text>
+    <rect x="10" y="112" width="360" height="90" rx="4" fill="#1e1e2e" stroke="#2a2a3a" stroke-width="0.5"/>
+    <text x="20" y="128" font-family="sans-serif" font-size="8" fill="#888" font-weight="bold">Collections</text>
+    <text x="20" y="142" font-family="monospace" font-size="8" fill="#0d7377" font-weight="bold">ash_knowledge</text>
+    <text x="130" y="142" font-family="sans-serif" font-size="8" fill="#aaa">8,320</text>
+    <text x="180" y="142" font-family="sans-serif" font-size="8" fill="#aaa">1,536</text>
+    <text x="240" y="142" font-family="sans-serif" font-size="8" fill="#aaa">Cosine</text>
+    <text x="20" y="156" font-family="monospace" font-size="8" fill="#0d7377">ash_docs</text>
+    <text x="130" y="156" font-family="sans-serif" font-size="8" fill="#aaa">3,120</text>
+    <text x="180" y="156" font-family="sans-serif" font-size="8" fill="#aaa">768</text>
+    <text x="240" y="156" font-family="sans-serif" font-size="8" fill="#aaa">Dot</text>
+    <text x="20" y="170" font-family="monospace" font-size="8" fill="#0d7377">ash_embeddings</text>
+    <text x="130" y="170" font-family="sans-serif" font-size="8" fill="#aaa">1,024</text>
+    <text x="180" y="170" font-family="sans-serif" font-size="8" fill="#aaa">384</text>
+    <text x="240" y="170" font-family="sans-serif" font-size="8" fill="#aaa">Euclid</text>
+  </g>
+  
+  <!-- Overlay -->
+  <rect width="1280" height="720" fill="url(#overlay)"/>
+  
+  <!-- Subtle bottom gradient for text -->
+  <rect x="0" y="530" width="1280" height="190" fill="url(#overlay)"/>
+  
+  <!-- Title -->
+  <text x="640" y="580" text-anchor="middle" font-family="sans-serif" font-size="36" fill="#fff" font-weight="bold" letter-spacing="4">ASH</text>
+  <text x="640" y="612" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#0d7377" letter-spacing="8">ARCH LINUX · AI · LOCAL</text>
+  <text x="640" y="640" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#666">Your local AI development environment, powered by Arch</text>
+  
+  <!-- Play button outer circle -->
+  <circle cx="640" cy="340" r="60" fill="rgba(13, 115, 119, 0.85)" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+  
+  <!-- Play button inner circle (glow) -->
+  <circle cx="640" cy="340" r="48" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  
+  <!-- Play triangle -->
+  <polygon points="624,318 624,362 658,340" fill="#fff">
+    <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
+  </polygon>
+  
+  <!-- Subtle ring pulse -->
+  <circle cx="640" cy="340" r="60" fill="none" stroke="rgba(13, 115, 119, 0.3)" stroke-width="2">
+    <animate attributeName="r" values="60;70;60" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Bottom divider -->
+  <line x1="440" y1="665" x2="840" y2="665" stroke="#0d7377" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Duration badge -->
+  <rect x="610" y="680" width="60" height="18" rx="9" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+  <text x="640" y="693" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#bbb">03:42</text>
+</svg>

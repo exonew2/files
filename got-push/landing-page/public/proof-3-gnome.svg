@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" width="400" height="225">
+  <rect width="400" height="225" fill="#fafafa"/>
+  
+  <!-- GNOME top bar -->
+  <rect x="0" y="0" width="400" height="24" fill="#1a1a2e"/>
+  
+  <!-- Activities button -->
+  <rect x="8" y="4" width="60" height="16" rx="3" fill="#2d2d44"/>
+  <text x="38" y="16" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#ccc">Activities</text>
+  
+  <!-- Clock -->
+  <text x="200" y="16" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#ddd">Thu Jul 17  14:23</text>
+  
+  <!-- System tray -->
+  <rect x="310" y="6" width="12" height="12" rx="2" fill="#0d7377"/>
+  <rect x="328" y="6" width="12" height="12" rx="2" fill="#0d7377"/>
+  <rect x="346" y="6" width="14" height="12" rx="2" fill="#0d7377"/>
+  <circle cx="370" cy="12" r="6" fill="#3b82f6"/>
+  
+  <!-- Desktop background (subtle gradient) -->
+  <rect x="0" y="24" width="400" height="201" fill="#e9eef0"/>
+  
+  <!-- Terminal window -->
+  <rect x="12" y="32" width="185" height="140" rx="6" fill="#1e1e2e" stroke="#ccc" stroke-width="0.5"/>
+  <!-- Title bar -->
+  <rect x="12" y="32" width="185" height="24" rx="6" fill="#2d2d44"/>
+  <rect x="12" y="48" width="185" height="8" fill="#2d2d44"/>
+  <!-- Window buttons -->
+  <circle cx="26" cy="44" r="4" fill="#ff5f57"/>
+  <circle cx="40" cy="44" r="4" fill="#febc2e"/>
+  <circle cx="54" cy="44" r="4" fill="#28c840"/>
+  <text x="104" y="47" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#bbb">ash@ash:~</text>
+  <!-- Terminal content -->
+  <text x="20" y="64" font-family="monospace" font-size="8" fill="#0d0">$</text>
+  <text x="30" y="64" font-family="monospace" font-size="8" fill="#cdd6f4">ash --version</text>
+  <text x="20" y="76" font-family="monospace" font-size="8" fill="#89b4fa">ash v0.1.0</text>
+  <text x="20" y="88" font-family="monospace" font-size="8" fill="#0d0">$</text>
+  <text x="30" y="88" font-family="monospace" font-size="8" fill="#cdd6f4">sudo pacman -Syu</text>
+  <text x="20" y="100" font-family="monospace" font-size="8" fill="#94e2d5">resolving dependencies...</text>
+  <text x="20" y="112" font-family="monospace" font-size="8" fill="#94e2d5">looking for conflicting files...</text>
+  <text x="20" y="124" font-family="monospace" font-size="8" fill="#f9e2af">(1/1) checking keys</text>
+  <text x="20" y="136" font-family="monospace" font-size="8" fill="#f9e2af">(1/1) checking package integrity</text>
+  <text x="20" y="148" font-family="monospace" font-size="8" fill="#89b4fa">Packages (3): linux-6.8.2</text>
+  <text x="20" y="160" font-family="monospace" font-size="8" fill="#0d0">$</text>
+  <rect x="30" y="152" width="5" height="9" fill="#cdd6f4">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- VS Code window -->
+  <rect x="205" y="32" width="185" height="160" rx="6" fill="#1e1e2e" stroke="#ccc" stroke-width="0.5"/>
+  <!-- Title bar -->
+  <rect x="205" y="32" width="185" height="24" rx="6" fill="#2d2d44"/>
+  <rect x="205" y="48" width="185" height="8" fill="#2d2d44"/>
+  <circle cx="219" cy="44" r="4" fill="#ff5f57"/>
+  <circle cx="233" cy="44" r="4" fill="#febc2e"/>
+  <circle cx="247" cy="44" r="4" fill="#28c840"/>
+  <!-- Sidebar -->
+  <rect x="205" y="56" width="36" height="136" fill="#181825"/>
+  <rect x="207" y="60" width="32" height="3" fill="#0d7377"/>
+  <rect x="207" y="68" width="32" height="3" fill="#313244"/>
+  <rect x="207" y="76" width="32" height="3" fill="#313244"/>
+  <rect x="207" y="84" width="32" height="3" fill="#313244"/>
+  <rect x="207" y="92" width="32" height="3" fill="#313244"/>
+  <!-- Editor content -->
+  <text x="248" y="64" font-family="monospace" font-size="7" fill="#6c7086">└─ src/</text>
+  <rect x="248" y="68" width="112" height="2" fill="#313244"/>
+  <text x="248" y="78" font-family="monospace" font-size="7" fill="#cba6f7">import</text>
+  <text x="278" y="78" font-family="monospace" font-size="7" fill="#cdd6f4">{ defineComponent }</text>
+  <text x="366" y="78" font-family="monospace" font-size="7" fill="#6c7086">from</text>
+  <text x="248" y="88" font-family="monospace" font-size="7" fill="#cdd6f4">import</text>
+  <text x="264" y="88" font-family="monospace" font-size="7" fill="#cdd6f4">{</text>
+  <text x="272" y="88" font-family="monospace" font-size="7" fill="#cdd6f4">ref, computed }</text>
+  <text x="248" y="98" font-family="monospace" font-size="7" fill="#f38ba8">import</text>
+  <text x="268" y="98" font-family="monospace" font-size="7" fill="#cdd6f4">{ useStore }</text>
+  <text x="248" y="108" font-family="monospace" font-size="7" fill="#6c7086">const</text>
+  <text x="268" y="108" font-family="monospace" font-size="7" fill="#f9e2af">Greeting</text>
+  <text x="310" y="108" font-family="monospace" font-size="7" fill="#cdd6f4">= ()</text>
+  <text x="248" y="118" font-family="monospace" font-size="7" fill="#cdd6f4">  return (</text>
+  <text x="248" y="128" font-family="monospace" font-size="7" fill="#0d7377">&lt;div</text>
+  <text x="270" y="128" font-family="monospace" font-size="7" fill="#f9e2af">className</text>
+  <text x="308" y="128" font-family="monospace" font-size="7" fill="#cdd6f4">=</text>
+  <text x="314" y="128" font-family="monospace" font-size="7" fill="#a6e3a1">"ash-app"</text>
+  <text x="248" y="138" font-family="monospace" font-size="7" fill="#cdd6f4">    &lt;h1&gt;Hello, ash!&lt;/h1&gt;</text>
+  <text x="248" y="148" font-family="monospace" font-size="7" fill="#cdd6f4">  &lt;/div&gt;</text>
+  <text x="248" y="158" font-family="monospace" font-size="7" fill="#cdd6f4">)</text>
+  
+  <!-- Bottom dock -->
+  <rect x="120" y="196" width="160" height="24" rx="4" fill="rgba(0,0,0,0.1)"/>
+  <!-- Dock icons -->
+  <rect x="132" y="200" width="18" height="16" rx="3" fill="#0d7377"/>
+  <rect x="156" y="200" width="18" height="16" rx="3" fill="#555"/>
+  <rect x="180" y="200" width="18" height="16" rx="3" fill="#555"/>
+  <rect x="204" y="200" width="18" height="16" rx="3" fill="#555"/>
+  <rect x="228" y="200" width="18" height="16" rx="3" fill="#555"/>
+  <rect x="252" y="200" width="18" height="16" rx="3" fill="#555"/>
+  
+  <!-- Desktop icons -->
+  <rect x="370" y="180" width="24" height="20" rx="2" fill="rgba(0,0,0,0.05)"/>
+  <text x="382" y="196" text-anchor="middle" font-family="sans-serif" font-size="6" fill="#555">Trash</text>
+</svg>

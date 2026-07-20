@@ -1,31 +1,35 @@
 ---
 title: Comparison
-description: How the ash-iso VM deployment compares to manual Arch setup, other VM images, and cloud alternatives.
+description: ash-iso VM deploy vs plain Arch vs other ISOs — when to use what.
 order: 6
 ---
 
-| Feature | **ash-iso VM** | Manual Arch VM | Ubuntu Desktop | Cloud Codespaces |
-|---------|---------------|----------------|----------------|-----------------|
-| **Setup Time** | 1 command | Hours | 15 min | 5 min |
-| **Local / Offline** | Yes | Yes | Yes | No |
-| **LSFS Semantic FS** | Included | Manual | Manual | No |
-| **Ollama + Embeddings** | Pre-configured | Manual | Manual | Possible |
-| **Qdrant Vector Store** | Standalone binary | Manual | Manual | No |
-| **VMware Optimized** | Yes | You build it | Partial | N/A |
-| **Cost** | Free | Free (time) | Free | $10-50/mo |
-
-## When to Use
-
-| Use Case | Recommended |
-|----------|-------------|
-| Local AI development with semantic search | **ash-iso VM** |
-| Full control over Arch environment | Manual Arch VM |
-| General-purpose Linux desktop | Ubuntu / Fedora |
-| Team collaboration, cloud CI/CD | Codespaces / Gitpod |
+| Feature | **ash-iso VM Deploy** | **Plain Arch VM** | **Other ISOs (Ubuntu/Fedora)** |
+|---------|----------------------|-------------------|--------------------------------|
+| **Setup time** | 1 command | Hours | 15-30 min |
+| **LSFS semantic search** | Included | Manual | Not available |
+| **Ollama + nomic-embed-text** | Pre-configured, pinned in VRAM | Manual install | Manual |
+| **Qdrant vector store** | Standalone binary + systemd | Manual Docker/binary | Manual Docker/binary |
+| **Launcher mechanism** | Pure-bash hook (curl to APIs) | Requires Python/Node | Requires Python/Node |
+| **Hyprland + Catppuccin** | Pre-configured, auto-login | Manual config | Different DE |
+| **VMware-first** | VMX workarounds, clipboard, display fix | Not optimized | Partial support |
+| **Auto-start** | systemd + wofi on Super+Space | Manual | Varies |
 
 ## Key Differentiators
 
-- **Pure-bash LSFS hook** — no Python runtime dependency
-- **nomic-embed-text** — lightweight 768-dim embeddings
-- **Qdrant standalone** — no Docker needed, single binary
-- **VM-only deployment** — no bare-metal install, no dual-boot
+- **Pure-bash launcher hook** — no Python/Node runtime dependency for queries
+- **Standalone Qdrant** — single binary, no Docker, managed via systemd
+- **VMware-first** — deployment includes VMX edits, display workaround, clipboard config
+- **nomic-embed-text pinned in VRAM** — consistent latency for embeddings
+
+## When to Use
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Local AI semantic filesystem on VMware | **ash-iso VM deploy** |
+| General Arch with Hyprland | Plain Arch (more control) |
+| Quick desktop without LSFS | Ubuntu / Fedora |
+
+## Repo
+
+`github.com/exonew2/files` (private) — deploy script, launcher hook, and LSFS daemon.

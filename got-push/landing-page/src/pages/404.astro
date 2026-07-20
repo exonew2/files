@@ -1,0 +1,22 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout
+    title="404 — Page Not Found | Ash-ISO"
+    description="The page you're looking for doesn't exist. Deploy Ash-ISO on your Arch Linux VM."
+>
+
+<section class="page-hero" style="min-height: 60vh; display: flex; align-items: center;">
+    <div class="container">
+        <h1 style="font-size: clamp(48px, 8vw, 96px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; color: var(--brand);">404</h1>
+        <p style="font-size: 24px; color: var(--text-dim); margin-bottom: 8px;">This page doesn't exist.</p>
+        <p style="font-size: 16px; color: var(--text-muted); margin-bottom: 32px;">Maybe you were looking to deploy Ash-ISO?</p>
+        <div class="hero-cta-row">
+            <a href="/" class="btn btn-primary btn-lg">Home</a>
+            <a href="/download" class="btn btn-secondary btn-lg">Deploy</a>
+            <a href="/docs" class="btn btn-ghost btn-lg">Docs</a>
+        </div>
+    </div>
+</section>
+
+</Layout>

@@ -1,0 +1,219 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../data/site-config';
+
+const { siteUrl } = SITE_CONFIG;
+const oneLiner = 'curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-fix-v2.sh | sudo bash';
+---
+
+<Layout
+    title="Ash-ISO — Deploy AI-Native Arch VM in One Command"
+    description="One-liner. Semantic search. Vector memory. VMware. Hyprland. — Deploy LSFS on your existing Arch VM in seconds."
+    ogImage="/og-image.svg"
+    ogUrl={siteUrl}
+>
+
+<section class="hero" aria-labelledby="hero-title">
+    <div class="container">
+        <h1 id="hero-title" class="hero-headline reveal">
+            Ash-ISO<br>
+            <span class="hero-headline-accent">Deploy AI-Native Arch VM in One Command</span>
+        </h1>
+        <p class="hero-subhead reveal">
+            <strong>One-liner.</strong> Semantic search. Vector memory. VMware. Hyprland.
+        </p>
+
+        <div class="hero-cta-row reveal" role="group" aria-label="Install command">
+            <pre class="one-liner"><code>{oneLiner}</code></pre>
+            <button class="btn btn-primary btn-lg" data-copy={oneLiner}>
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                <span>Copy & run</span>
+            </button>
+        </div>
+
+        <p class="hero-footnote reveal">
+            Requires an existing Arch Linux VMware VM. <a href="https://github.com/exonew2/files" target="_blank" rel="noopener">GitHub →</a>
+        </p>
+    </div>
+</section>
+
+<section class="section zero-config reveal" aria-labelledby="what-title">
+    <div class="container">
+        <h2 id="what-title" class="section-title">What You Get</h2>
+        <div class="promise-grid">
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+                <h3>Semantic Search</h3>
+                <p>Press <kbd>Super</kbd>+<kbd>Space</kbd> → launcher hook queries <strong>Ollama</strong> → embeddings stored in <strong>Qdrant</strong> → find files by concept, not just name.</p>
+            </article>
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+                <h3>Vector Memory</h3>
+                <p><strong>Qdrant</strong> standalone — persistent vector database that remembers your context across sessions. Built for local-first AI.</p>
+            </article>
+            <article class="promise-card">
+                <div class="promise-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--brand)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                <h3>VMware Optimized</h3>
+                <p>VMX workaround applied automatically. Clipboard sharing, drag & drop, and display drivers pre-configured for VMware Fusion &amp; Workstation.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section proof reveal" aria-labelledby="arch-title">
+    <div class="container">
+        <h2 id="arch-title" class="section-title">Architecture</h2>
+        <pre class="arch-diagram"><code>┌─────────────────────────────────────────────────┐
+│                  Hyprland Desktop                │
+│  ┌───────────────────────────────────────────┐  │
+│  │         Super+Space Launcher (bash)        │  │
+│  │              ↓ semantic query               │  │
+│  │         Ollama (embedding model)            │  │
+│  │              ↓ vector embedding             │  │
+│  │         Qdrant (vector database)            │  │
+│  │              ↓ ranked results               │  │
+│  │         LSFS semantic file search           │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │          VMware VMX workaround             │  │
+│  │          Clipboard sharing                 │  │
+│  │          Display drivers                   │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘</code></pre>
+        <p class="arch-caption">Single VM. One command. Everything wired.</p>
+    </div>
+</section>
+
+<section class="section comparison reveal" aria-labelledby="why-no-iso-title">
+    <div class="container">
+        <h2 id="why-no-iso-title" class="section-title">Why Not ISO?</h2>
+        <p class="section-subtext">Ash-ISO is a <em>deploy-on-existing-Arch</em> script. No bloated ISO download, no bespoke kernel, no lock-in.</p>
+        <ul class="why-list">
+            <li><strong>You already have Arch.</strong> Why download 2.3 GB when one command works on your existing VM?</li>
+            <li><strong>Your config, your kernel.</strong> Keep your custom kernel, modules, and packaging. Ash-ISO layers on top.</li>
+            <li><strong>No trust transfer.</strong> No ISO build pipeline to audit. One bash script — read it before you run it.</li>
+            <li><strong>Roll with pacman.</strong> Your existing <code>pacman -Syu</code> keeps working. No immutable image to rebuild.</li>
+        </ul>
+
+        <h3 class="comparison-subtitle">Ash-ISO vs Plain Arch vs ISO-Based Projects</h3>
+        <div class="table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature</th>
+                        <th scope="col"><strong>Ash-ISO</strong></th>
+                        <th scope="col">Plain Arch VM</th>
+                        <th scope="col">Custom ISO</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><th scope="row">Setup Time</th><td><span class="check">~2 min</span> One command</td><td><span class="cross">Hours</span> Manual</td><td><span class="cross">~45 min</span> Download + boot</td></tr>
+                    <tr><th scope="row">Semantic Search</th><td><span class="check">Yes</span> LSFS + Super+Space</td><td><span class="cross">No</span> DIY</td><td><span class="check">Yes</span></td></tr>
+                    <tr><th scope="row">Vector Memory</th><td><span class="check">Yes</span> Qdrant standalone</td><td><span class="cross">No</span> Manual install</td><td><span class="check">Yes</span></td></tr>
+                    <tr><th scope="row">VMware Tuning</th><td><span class="check">Yes</span> VMX fix + clipboard</td><td><span class="cross">No</span> Manual</td><td><span class="warn">Partial</span></td></tr>
+                    <tr><th scope="row">Desktop</th><td><span class="check">Hyprland</span></td><td><span class="cross">No</span> DIY</td><td><span class="warn">Various</span></td></tr>
+                    <tr><th scope="row">Supply Chain</th><td><span class="check">Auditable</span> One bash script</td><td><span class="check">Full control</span></td><td><span class="warn">Opaque ISO</span></td></tr>
+                    <tr><th scope="row">ISO Download</th><td><span class="check">None</span> Zero bytes</td><td><span class="check">None</span></td><td><span class="cross">2.3+ GB</span></td></tr>
+                    <tr><th scope="row">Custom kernel / modules</th><td><span class="check">Yours</span> Unchanged</td><td><span class="check">Yours</span></td><td><span class="cross">Bespoke</span></td></tr>
+                    <tr><th scope="row">Pacman Updates</th><td><span class="check">Normal</span> Uninterrupted</td><td><span class="check">Normal</span></td><td><span class="cross">Immutable</span> Requires rebuild</td></tr>
+                    <tr><th scope="row">Rollback</th><td><span class="warn">Btrfs/ZFS</span> Your choice</td><td><span class="warn">Btrfs/ZFS</span> Your choice</td><td><span class="check">Snapper built in</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="section features reveal" aria-labelledby="how-title">
+    <div class="container">
+        <h2 id="how-title" class="section-title">How It Works</h2>
+        <div class="features-grid">
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div>
+                <h3>One-Liner Deploy</h3>
+                <p>Pipe the script from the repo into <code>sudo bash</code>. It detects your VM, installs LSFS, Ollama, Qdrant, and wires the Hyprland launcher hook — all in under two minutes.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ai)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+                <h3>Semantic File Search</h3>
+                <p>Hit <kbd>Super</kbd>+<kbd>Space</kbd>, type what you mean — "budget spreadsheet from last quarter" or "that blog draft about AI safety". The bash launcher sends your query to Ollama, which embeds it, and Qdrant returns the closest files.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+                <h3>Vector Memory That Persists</h3>
+                <p>Qdrant runs as a systemd service with persistent storage. Your semantic index survives reboots. Import new files and they're automatically embedded and searchable via the launcher.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+                <h3>VMware First-Class</h3>
+                <p>The script applies the VMX workaround for proper GPU acceleration, enables bidirectional clipboard, drag-and-drop, and installs <code>open-vm-tools</code> — tuned for VMware Fusion &amp; Workstation.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                <h3>No Lock-in</h3>
+                <p>Every component is a standard Arch package. Uninstall any piece with <code>pacman -R</code>. The script is idempotent — run it again to repair or update. Your system, your rules.</p>
+            </article>
+            <article class="feature-card">
+                <div class="feature-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--ai)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+                <h3>Auditable by Design</h3>
+                <p>No opaque ISO. Read the single bash script before running it. Pin a specific commit. Fork it, patch it, own it. The entire deploy pipeline is a file on GitHub.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="section faq reveal" aria-labelledby="faq-title">
+    <div class="container">
+        <h2 id="faq-title" class="section-title">FAQ</h2>
+        <dl class="faq-list">
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-1">Do I need to start from a fresh Arch install?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-1" class="faq-answer" hidden>
+                    <p>No. The script works on any existing Arch Linux VMware VM — fresh or battle-worn. It installs packages and configures services without wiping your data. <a href="https://github.com/exonew2/files" target="_blank" rel="noopener">Check the README →</a></p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-2">What if I already have Hyprland?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-2" class="faq-answer" hidden>
+                    <p>The script detects Hyprland. If present, it only adds the <kbd>Super</kbd>+<kbd>Space</kbd> launcher hook. No duplicate configs, no destructive changes.</p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-3">Is this secure?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-3" class="faq-answer" hidden>
+                    <p>Read the script before running it — it's one file on GitHub. Services are sandboxed via systemd service hardening. Qdrant binds to localhost only. Ollama runs unprivileged.</p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-4">Can I use this on bare metal?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-4" class="faq-answer" hidden>
+                    <p>Yes — but the VMX workaround and <code>open-vm-tools</code> only apply to VMware VMs. On bare metal, you get everything else: LSFS, Ollama, Qdrant, and the Hyprland launcher hook.</p>
+                </dd>
+            </div>
+            <div class="faq-item">
+                <dt><button class="faq-question" aria-expanded="false" aria-controls="faq-5">How do I update?<svg class="faq-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></dt>
+                <dd id="faq-5" class="faq-answer" hidden>
+                    <p>Standard Arch pacman updates for packages. Rerun the script to pick up the latest config. The script is idempotent — running it again only applies new changes.</p>
+                </dd>
+            </div>
+        </dl>
+    </div>
+</section>
+
+<section class="section cta-final reveal" aria-labelledby="cta-title">
+    <div class="container">
+        <h2 id="cta-title" class="section-title">Deploy Now</h2>
+        <p class="cta-final-text">One command. Your existing Arch VM. Semantic search in under two minutes.</p>
+        <div class="cta-final-row">
+            <pre class="one-liner"><code>{oneLiner}</code></pre>
+            <button class="btn btn-primary btn-xl" data-copy={oneLiner}>
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                <span>Copy & run</span>
+            </button>
+        </div>
+        <div class="cta-final-trust">
+            <span>Repo: <a href="https://github.com/exonew2/files" target="_blank" rel="noopener">github.com/exonew2/files</a></span>
+        </div>
+    </div>
+</section>
+
+</Layout>

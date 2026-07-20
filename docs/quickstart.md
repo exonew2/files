@@ -1,4 +1,4 @@
-# Quick Start — Deploy on Existing Arch Linux
+# Quick Start
 
 ## Prerequisites
 
@@ -13,23 +13,21 @@ curl -sfL https://raw.githubusercontent.com/exonew2/files/main/scripts/ultimate-
 ```
 
 Idempotent — safe to re-run. Installs:
-
 - Qdrant standalone binary from GitHub releases → systemd service on `:6333`
 - LSFS daemon (`~/.config/scripts/lsfs_daemon.py`) → user systemd service
 - Launcher hook (`~/.config/scripts/lsfs_launcher_hook.sh`) → Super+Space
-- VMware clipboard fix (`open-vm-tools` integration)
 - Enables auto-login to Hyprland
 
 ## Post-Deploy
 
 1. Reboot or restart Hyprland (Super+Shift+Q)
 2. Press **Super+Space** to open the semantic launcher
-3. Type a natural-language query (e.g. `my notes`, `config files`, `python scripts`)
+3. Type a natural-language query (e.g. `config`, `scripts`, `TODO`)
 4. Select a result → opens in Kitty + Neovim (or respective application)
 
 ## What to Test
 
-- **Search by concept** — type "TODO lists" or "shell scripts" → returns semantically similar files
+- **Search by concept** — type "TODO" or "config" → returns semantically similar files
 - **Search by time** — type "files from 42h" or "files from 3d" → falls back to `fd`/`find` time-based search
 - **Tail daemon logs** — `journalctl --user -u lsfs-daemon -f` to see real-time indexing
 

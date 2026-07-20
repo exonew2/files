@@ -1,39 +1,47 @@
 ---
 title: GPU in VMware
-description: Configure GPU acceleration in VMware Fusion and Workstation for the ash-iso VM.
+description: VMware display workaround, VMX edits, and Ollama GPU detection for Hyprland.
 order: 3
 ---
 
-## VMware Fusion (macOS)
+## VMware 3D Acceleration
 
-1. Select the VM → Settings → Display
-2. Check **Accelerate 3D graphics**
-3. Check **Use host GPU** (Metal acceleration)
-4. Set at least **4 GB** video memory
-5. Apply and reboot the VM
-
-## VMware Workstation (Linux/Windows)
+In VMware Fusion / Workstation VM settings:
 
 1. VM → Settings → Display
-2. Check **Accelerate 3D graphics**
-3. Select **Use host settings for monitors**
-4. Set **Graphics memory** to 4 GB or higher
-5. Apply and reboot
+2. **Enable Accelerate 3D graphics**
+3. Allocate at least **4 GB** video memory
 
-## Verify Inside VM
+## VMX Workaround for Hyprland
+
+Hyprland requires explicit GPU configuration. Edit the `.vmx` file:
+
+```
+mks.enable3d = "TRUE"
+svga.guestBackedPrimary = "TRUE"
+svga.vramSize = "4294967296"
+```
+
+**Needs host action:** On Windows hosts, add `mks.enableGL=TRUE` to the VMX. On macOS Fusion, Metal acceleration is automatic with VM 13+.
+
+## Display Fix
+
+**Needs host action:** The VMX must include a display workaround for proper HiDPI / multi-monitor behavior with Hyprland. Add to `.vmx`:
+
+```
+gui.fitguestusingnativedisplayresolution = "TRUE"
+```
+
+## Ollama GPU Detection
+
+Ollama auto-detects the GPU. Verify inside the VM:
 
 ```bash
 # Check if GPU renderer is available
 glxinfo -B | grep -i renderer
 
-# Ollama GPU detection
-ollama run nomic-embed-text
-# Check logs for GPU device
+# Ollama detects GPU backend
 journalctl -u ollama --no-pager | grep -i gpu
 ```
 
-## Notes
-
-- VMware does not support true PCIe passthrough — 3D acceleration provides GPU compute via the VMware SVGA driver
-- For serious GPU workloads, use a Linux host with QEMU/KVM VFIO passthrough instead
-- On Apple Silicon Macs, Metal acceleration is automatic in VMware Fusion 13+
+**Note:** VMware provides GPU compute via SVGA 3D acceleration, not true PCIe passthrough. For bare-metal GPU performance, use QEMU/KVM with VFIO.

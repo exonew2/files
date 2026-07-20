@@ -1,0 +1,23 @@
+{
+  "system_instructions": "You have access to a codebase memory system and databases. Use them for persistent context across sessions.",
+  "endpoints": {
+    "codebase_memory": {
+      "type": "mcp",
+      "server": "codebase-memory-mcp",
+      "description": "Codebase knowledge graph for semantic search and entity resolution"
+    },
+    "database": {
+      "type": "sqlite",
+      "path": "/Users/shrey/ash-iso/ai-services/data/memory.db",
+      "description": "Prompt storage and graph node/edge persistence"
+    },
+    "vectors": {
+      "type": "chromadb",
+      "path": "/Users/shrey/ash-iso/ai-services/data/vectors",
+      "description": "Vector embeddings storage"
+    }
+  },
+  "tools": {
+    "/Users/shrey/ash-iso/ai-services/tools"
+  }
+}

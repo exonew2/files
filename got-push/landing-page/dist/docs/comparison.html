@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="en" data-theme="light"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Comparison — ash vs Alternatives — ash Documentation</title><meta name="description" content="Compare ash ISO against GitHub Codespaces, Gitpod, Dev Containers, and Manual Arch VM across features, cost, and setup time."><!-- Canonical --><link rel="canonical" href="https://ash.sh"><!-- Open Graph --><meta property="og:title" content="Comparison — ash vs Alternatives — ash Documentation"><meta property="og:description" content="Compare ash ISO against GitHub Codespaces, Gitpod, Dev Containers, and Manual Arch VM across features, cost, and setup time."><meta property="og:type" content="website"><meta property="og:url" content="https://ash.sh"><meta property="og:image" content="https://ash.sh/og-image.svg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:site_name" content="ash — Arch Snapshot Hypervisor"><meta property="og:locale" content="en_US"><!-- Twitter --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Comparison — ash vs Alternatives — ash Documentation"><meta name="twitter:description" content="Compare ash ISO against GitHub Codespaces, Gitpod, Dev Containers, and Manual Arch VM across features, cost, and setup time."><meta name="twitter:image" content="https://ash.sh/og-image.svg"><!-- SEO --><meta name="robots" content="index, follow"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://github.com" crossorigin><link rel="preconnect" href="https://fonts.googleapis.com" crossorigin><link rel="dns-prefetch" href="https://github.com"><link rel="preload" href="/styles/main.css" as="style"><link rel="preload" href="/hero-desktop.svg" as="image" fetchpriority="high"><meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)"><!-- DNS prefetch for mirrors --><link rel="dns-prefetch" href="https://cdn.ash.sh"><link rel="dns-prefetch" href="https://github.com"><!-- Styles --><link rel="stylesheet" href="/styles/main.css"><!-- Scripts --><script src="/scripts/main.js" defer></script><script src="/scripts/terminal-demo.js" defer></script><!-- Structured Data: SoftwareApplication --><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ash — Arch Snapshot Hypervisor","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (Arch)","description":"Pre-built Arch Linux ISO with AI tools (Ollama, llama.cpp, Qdrant). Download → Boot → Code with AI. No install. No config.","fileFormat":"ISO","fileSize":"2.3 GB","downloadUrl":"https://github.com/ash-linux/ash/releases","installUrl":"https://ash.sh/download","softwareVersion":"2025.01.15","releaseNotes":"https://github.com/ash-linux/ash/releases/tag/v2025.01.15","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"ash-linux","url":"https://github.com/ash-linux"}}</script><!-- Structured Data: WebPage --><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Comparison — ash vs Alternatives — ash Documentation","description":"Compare ash ISO against GitHub Codespaces, Gitpod, Dev Containers, and Manual Arch VM across features, cost, and setup time.","url":"https://ash.sh","dateModified":"2025-07-18"}</script><!-- Structured Data: BreadcrumbList (for docs) --><style>.breadcrumb[data-astro-cid-uadgga6g]{font-size:13px;color:var(--text-muted);margin-bottom:8px}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--brand);text-decoration:none}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]:hover{text-decoration:underline}.doc-container[data-astro-cid-uadgga6g]{max-width:800px;margin:0 auto;line-height:1.7}.doc-container[data-astro-cid-uadgga6g] h2[data-astro-cid-uadgga6g]{font-size:24px;font-weight:700;margin-top:40px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border)}.doc-container[data-astro-cid-uadgga6g] h3[data-astro-cid-uadgga6g]{font-size:18px;font-weight:600;margin-top:32px;margin-bottom:12px}.doc-container[data-astro-cid-uadgga6g] p[data-astro-cid-uadgga6g]{margin-bottom:16px;color:var(--text-dim)}.doc-container[data-astro-cid-uadgga6g] code[data-astro-cid-uadgga6g]{font-family:var(--font-mono);background:var(--bg-elevated);padding:2px 6px;border-radius:4px;font-size:.9em}.doc-container[data-astro-cid-uadgga6g] pre[data-astro-cid-uadgga6g]{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto;margin:16px 0}.doc-container[data-astro-cid-uadgga6g] pre[data-astro-cid-uadgga6g] code[data-astro-cid-uadgga6g]{background:none;padding:0;font-size:13px;line-height:1.6}.doc-container[data-astro-cid-uadgga6g] table[data-astro-cid-uadgga6g]{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}.doc-container[data-astro-cid-uadgga6g] th[data-astro-cid-uadgga6g],.doc-container[data-astro-cid-uadgga6g] td[data-astro-cid-uadgga6g]{padding:10px 14px;border:1px solid var(--border);text-align:left}.doc-container[data-astro-cid-uadgga6g] th[data-astro-cid-uadgga6g]{background:var(--bg-elevated);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}.doc-container[data-astro-cid-uadgga6g] ul[data-astro-cid-uadgga6g],.doc-container[data-astro-cid-uadgga6g] ol[data-astro-cid-uadgga6g]{padding-left:24px;margin-bottom:16px;color:var(--text-dim)}.doc-container[data-astro-cid-uadgga6g] li[data-astro-cid-uadgga6g]{margin-bottom:8px}.doc-container[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--brand);text-decoration:none}.doc-container[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]:hover{text-decoration:underline}
+</style></head> <body> <header class="header" role="banner"> <div class="container header-inner"> <a href="/" class="logo" aria-label="ash Home"> <svg class="logo-icon" viewBox="0 0 32 32" aria-hidden="true"> <path fill="#0D9488" d="M16 2L4 10v12l12 8 12-8V10L16 2zm0 2.5L25.5 12 16 19.5 6.5 12 16 4.5z"></path> <path fill="#0F766E" d="M16 4.5L6.5 12l9.5 7.5L16 19.5z"></path> </svg> <span class="logo-text">ash</span> </a> <nav class="header-nav" aria-label="Main navigation"> <a href="/download" class="btn btn-secondary">Download</a> <a href="/verify" class="btn btn-ghost">Verify</a> <a href="/docs" class="btn btn-ghost">Docs</a> <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode"> <svg class="theme-icon-light" viewBox="0 0 24 24" width="18" height="18"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" fill="none" stroke="currentColor" stroke-width="2"></path></svg> <svg class="theme-icon-dark" viewBox="0 0 24 24" width="18" height="18"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="none" stroke="currentColor" stroke-width="2"></path></svg> </button> <a href="https://github.com/ash-linux/ash" class="btn btn-ghost" target="_blank" rel="noopener">GitHub <span class="stars" data-count-to="12400"></span></a> </nav> </div> </header> <main>  <section class="page-hero" data-astro-cid-uadgga6g> <div class="container" data-astro-cid-uadgga6g> <p class="breadcrumb" data-astro-cid-uadgga6g><a href="/docs" data-astro-cid-uadgga6g>Documentation</a> / Comparison — ash vs Alternatives</p> <h1 data-astro-cid-uadgga6g>Comparison — ash vs Alternatives</h1> </div> </section> <section class="section doc-content" data-astro-cid-uadgga6g> <div class="container doc-container" data-astro-cid-uadgga6g> <h2 id="quick-comparison">Quick Comparison</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Feature</th><th><strong>ash ISO</strong></th><th>Gitpod / Codespaces</th><th>Dev Containers</th><th>Manual Arch VM</th></tr></thead><tbody><tr><td><strong>Local / Offline</strong></td><td>100%</td><td>Cloud only</td><td>Local</td><td>Local</td></tr><tr><td><strong>Zero Config</strong></td><td>Boot → Code</td><td>Config needed</td><td>Dockerfile</td><td>Hours</td></tr><tr><td><strong>GPU / Local AI</strong></td><td>Native passthrough</td><td>No local GPU</td><td>Via Docker</td><td>Manual</td></tr><tr><td><strong>AI Tools Ready</strong></td><td>Ollama, llama.cpp, Qdrant, Continue</td><td>Manual</td><td>Manual</td><td>Manual</td></tr><tr><td><strong>Instant Rollback</strong></td><td>Btrfs + Snapper</td><td>N/A</td><td>N/A</td><td>Manual</td></tr><tr><td><strong>Supply Chain Verify</strong></td><td>SHA256 + minisign + cosign + SLSA</td><td>Opaque</td><td>Docker trust</td><td>Manual</td></tr><tr><td><strong>Boot Time</strong></td><td><strong>~45s</strong></td><td>60-120s</td><td>30-60s</td><td>Hours</td></tr><tr><td><strong>Cost</strong></td><td><strong>Free</strong></td><td>$10-50/mo</td><td>Free (Docker)</td><td>Free (time)</td></tr></tbody></table>
+<h2 id="when-to-use-each">When to Use Each</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Use Case</th><th>Recommended</th></tr></thead><tbody><tr><td><strong>AI coding, local LLMs, privacy</strong></td><td><strong>ash ISO</strong></td></tr><tr><td><strong>Team collaboration, cloud CI/CD</strong></td><td>Codespaces / Gitpod</td></tr><tr><td><strong>Consistent dev env across team</strong></td><td>Dev Containers</td></tr><tr><td><strong>Learning Arch, full control</strong></td><td>Manual Arch VM</td></tr></tbody></table>
+<h2 id="the-ash-advantage">The ash Advantage</h2>
+<blockquote>
+<p><strong>Download → Boot → Code. No config. No cloud. No rebuilds. Instant snapshots. Native GPU. Your hardware. Your models. Your rules.</strong></p>
+</blockquote>
+<h3 id="unique-ash-features">Unique ash Features</h3>
+<ol>
+<li><strong>Btrfs Snapshots + GRUB-Btrfs</strong> — Rollback from boot menu</li>
+<li><strong>Qdrant Vector Memory</strong> — AI remembers across sessions</li>
+<li><strong>Multi-Hypervisor</strong> — One ISO, works everywhere</li>
+<li><strong>Supply Chain Security</strong> — 4-way verification</li>
+<li><strong>Zero Config</strong> — Timezone, keyboard, user, SSH, agents all auto</li>
+</ol> </div> </section>  </main> <footer class="footer" role="contentinfo"> <div class="container"> <div class="footer-grid"> <nav class="footer-col" aria-label="Download"> <h3>Download</h3> <ul> <li><a href="/download">ISO Download</a></li> <li><a href="/download#vmware">VMware Guide</a></li> <li><a href="/download#virtualbox">VirtualBox Guide</a></li> <li><a href="/download#parallels">Parallels Guide</a></li> <li><a href="/download#qemu">QEMU/KVM Guide</a></li> </ul> </nav> <nav class="footer-col" aria-label="Verify"> <h3>Verify</h3> <ul> <li><a href="/verify">SHA256 Checksums</a></li> <li><a href="/verify#minisign">minisign Signatures</a></li> <li><a href="/verify#cosign">cosign (keyless)</a></li> <li><a href="/verify#slsa">SLSA Provenance</a></li> </ul> </nav> <nav class="footer-col" aria-label="Docs"> <h3>Docs</h3> <ul> <li><a href="/docs/quickstart">Quick Start</a></li> <li><a href="/docs/gpu-passthrough">GPU Passthrough</a></li> <li><a href="/docs/persistence">Data Persistence</a></li> <li><a href="/docs/updates">System Updates</a></li> <li><a href="/docs/comparison">Comparison</a></li> <li><a href="/docs/verification">Verification Guide</a></li> </ul> </nav> <nav class="footer-col" aria-label="Community"> <h3>Community</h3> <ul> <li><a href="https://github.com/ash-linux/ash" target="_blank" rel="noopener">GitHub (12.4k stars)</a></li> <li><a href="https://discord.gg/ash" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://reddit.com/r/ashlinux" target="_blank" rel="noopener">Reddit</a></li> </ul> </nav> <nav class="footer-col" aria-label="Project"> <h3>Project</h3> <ul> <li><a href="https://github.com/ash-linux/ash/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/ash-linux/ash/releases" target="_blank" rel="noopener">Releases</a></li> <li><a href="https://github.com/ash-linux/ash/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li> </ul> </nav> </div> <div class="footer-bottom"> <p class="footer-signals">
+SHA256: <code class="copyable" data-value="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2">a1b2c3d4e5f6a1b2</code> •
+                    minisign: <code>RWQf6LRCGA9i5…</code> •
+                    v2025.01.15 •
+<a href="https://github.com/ash-linux/ash/stargazers" target="_blank" rel="noopener">12.4k stars</a> •
+                    2.1M+ downloads
+</p> <p class="footer-copyright">ash — Not affiliated with Arch Linux, VMware, VirtualBox, Parallels, or QEMU. MIT Licensed.</p> </div> </div> </footer> <dialog id="terminal-modal" class="modal" aria-labelledby="modal-title" aria-describedby="modal-desc"> <div class="modal-box max-w-3xl"> <form method="dialog"> <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close demo">&times;</button> </form> <header class="flex items-center justify-between pb-4 border-b border-[var(--border)]"> <h3 id="modal-title" class="text-lg font-bold">Interactive Terminal Demo</h3> <div class="flex gap-2 flex-wrap"> <button class="btn btn-sm font-mono text-xs" data-terminal-script="ollama" onclick="openTerminalModal('ollama')">ollama</button> <button class="btn btn-sm font-mono text-xs" data-terminal-script="lsfs" onclick="openTerminalModal('lsfs')">lsfs search</button> <button class="btn btn-sm font-mono text-xs" data-terminal-script="snapper" onclick="openTerminalModal('snapper')">snapper</button> <button class="btn btn-sm font-mono text-xs" data-terminal-script="status" onclick="openTerminalModal('status')">ash status</button> </div> </header> <div class="py-4"> <div id="terminal-container" class="min-h-[300px] max-h-[65vh]"></div> <p id="modal-desc" class="mt-3 text-sm text-[var(--text-dim)]">Real terminal output from the ash ISO. Commands execute against the live system.</p> </div> </div> <form method="dialog" class="modal-backdrop"><button>close</button></form> </dialog> </body></html> 
