@@ -2,8 +2,7 @@
 
 ## Prerequisites
 
-- Arch Linux VM with Hyprland, git, sudo access
-- Arch Linux VM with Hyprland, git, sudo access\*, an
+- Arch Linux VM with Hyprland, git, and sudo access
 - Ollama installed and running (`ollama serve` or `systemctl start ollama`)
 - Internet connection for first-time setup
 

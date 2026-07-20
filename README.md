@@ -77,9 +77,11 @@ Idempotent. Safe to re-run. Installs everything below on an existing Arch Linux 
 
 ## Documentation
 
-- [`docs/quickstart.md`](docs/quickstart.md) — VM setup and first boot
-- [`docs/agentic-swarm-setup.md`](docs/agentic-swarm-setup.md) — Full end-to-end deployment guide
-- [`docs/lsfs-optimized-setup.md`](docs/lsfs-optimized-setup.md) — LSFS tuning, VMX config, GPU pinning
-- [`docs/persistence.md`](docs/persistence.md) — Btrfs snapshots and data persistence
-- [`docs/gpu-passthrough.md`](docs/gpu-passthrough.md) — GPU passthrough for hypervisors
-- [`docs/verification.md`](docs/verification.md) — Release signing and integrity
+- [`docs/quickstart.md`](docs/quickstart.md) — Deploy on existing Arch Linux in one command
+- [`docs/agentic-swarm-setup.md`](docs/agentic-swarm-setup.md) — Desktop integration guide (Hyprland, VMware, auto-login, services)
+- [`docs/lsfs-optimized-setup.md`](docs/lsfs-optimized-setup.md) — LSFS semantic filesystem architecture and design
+- [`docs/persistence.md`](docs/persistence.md) — What data survives reboot and how to back it up
+- [`docs/gpu-passthrough.md`](docs/gpu-passthrough.md) — VMware GPU configuration and VMX workarounds
+- [`docs/verification.md`](docs/verification.md) — Health checks for Qdrant, Ollama, daemon, and launcher
+- [`docs/comparison.md`](docs/comparison.md) — ash-iso vs plain Arch, Ubuntu, and ISO-based alternatives
+- [`docs/updates.md`](docs/updates.md) — Keeping the stack current via git pull
