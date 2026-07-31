@@ -8,6 +8,8 @@ lines=15
 prompt=Ash Command Palette
 term=kitty
 allow_images=true
+# Item 13: disable Pango markup to prevent crashes on file paths with & < > chars
+allow_markup=false
 show_all=true
 insensitive=true
 filter_rate=100

@@ -1,0 +1,21 @@
+[Unit]
+Description=Ash AI Agent Resource Slice (cgroups v2)
+Documentation=https://github.com/ash-linux/ash
+Before=slices.target
+
+[Slice]
+# Item 7: cgroups v2 resource quotas for agent processes
+# All services declared with Slice=ash-agents.slice inherit these limits
+
+# CPU: allow up to 2 full cores worth of CPU time
+CPUQuota=200%
+# Memory: hard limit — OOM-killer triggers at this ceiling
+MemoryMax=4G
+# Memory "soft" limit — cgroups will try to reclaim below this
+MemoryHigh=3G
+# Swap: agents should not be able to exhaust swap
+MemorySwapMax=1G
+# IO: limit to 80% of available disk bandwidth
+IOWeight=80
+# Tasks: cap total number of threads/processes
+TasksMax=512

@@ -1,23 +1,47 @@
 {
-  "system_instructions": "You have access to a codebase memory system and databases. Use them for persistent context across sessions.",
+  "system_instructions": "You have access to a codebase memory system, Qdrant vector DB, NotebookLM notebook knowledge, and 4,587 indexed project files. Use them for persistent context across sessions.",
+  "mcp_servers": {
+    "notebooklm": {
+      "command": "npx",
+      "args": [
+        "notebooklm-mcp-server",
+        "server"
+      ],
+      "description": "Google NotebookLM \u2014 architecture decisions, research notes"
+    },
+    "ash-project": {
+      "command": "python3",
+      "args": [
+        "/Users/shrey/ash-iso/.opencode/mcp-server/server.py"
+      ],
+      "env": {
+        "ASH_PROJECT_ROOT": "/Users/shrey/ash-iso/.opencode",
+        "NOTEBOOKLM_NOTEBOOKS": "18deba09-f237-4348-9ad8-68f4f6f859f7"
+      },
+      "description": "Local ash-iso project index (4,587 files, search_project/get_context)"
+    },
+    "codebase-memory": {
+      "command": "codebase-memory-mcp",
+      "args": [],
+      "env": {
+        "CBM_MEMORY_PATH": "/Users/shrey/ash-iso/ai-services/data/memory.db"
+      },
+      "description": "SQLite knowledge graph with graph nodes/edges"
+    }
+  },
   "endpoints": {
     "codebase_memory": {
       "type": "mcp",
-      "server": "codebase-memory-mcp",
-      "description": "Codebase knowledge graph for semantic search and entity resolution"
+      "server": "codebase-memory-mcp"
     },
     "database": {
       "type": "sqlite",
-      "path": "/Users/shrey/ash-iso/ai-services/data/memory.db",
-      "description": "Prompt storage and graph node/edge persistence"
+      "path": "/Users/shrey/ash-iso/ai-services/data/memory.db"
     },
     "vectors": {
       "type": "chromadb",
-      "path": "/Users/shrey/ash-iso/ai-services/data/vectors",
-      "description": "Vector embeddings storage"
+      "path": "/Users/shrey/ash-iso/ai-services/data/vectors"
     }
   },
-  "tools": {
-    "/Users/shrey/ash-iso/ai-services/tools"
-  }
+  "tools_dir": "/Users/shrey/ash-iso/ai-services/tools"
 }

@@ -1,0 +1,54 @@
+[Unit]
+Description=Ash AI Agent Isolation Setup (User Namespaces + Dep Firewall)
+Documentation=https://github.com/ash-linux/ash
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Item 8: enable user namespaces for unprivileged isolation
+ExecStart=/bin/bash -c '\
+  echo "Setting up user namespace isolation for Ash agents..." ; \
+  \
+  # Enable unprivileged user namespaces (required for userns-remap) \
+  sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true ; \
+  sysctl -w user.max_user_namespaces=15000 ; \
+  \
+  # Configure Docker userns-remap if Docker is present \
+  if command -v docker >/dev/null 2>&1; then \
+    mkdir -p /etc/docker ; \
+    if ! grep -q userns-remap /etc/docker/daemon.json 2>/dev/null; then \
+      python3 -c " \
+import json,os \
+f=\"/etc/docker/daemon.json\" \
+d={} \
+try: \
+    with open(f) as h: d=json.load(h) \
+except: pass \
+d[\"userns-remap\"]=\"aiuser\" \
+d[\"no-new-privileges\"]=True \
+with open(f,\"w\") as h: json.dump(d,h,indent=2) \
+" 2>/dev/null && echo \"Docker userns-remap configured\" ; \
+    fi ; \
+  fi ; \
+  \
+  # Install the dep-firewall shims for aiuser if present \
+  if [[ -f /usr/local/bin/ash-dep-firewall ]]; then \
+    for tool in npm pip pip3 cargo; do \
+      target="/usr/local/bin/ash-firewall-${tool}" ; \
+      if [[ ! -e "$target" ]]; then \
+        ln -sf /usr/local/bin/ash-dep-firewall "$target" ; \
+        echo "Linked dep-firewall for $tool" ; \
+      fi ; \
+    done ; \
+  fi ; \
+  \
+  echo "Agent isolation setup complete."'
+
+# Item 7: ensure the agent cgroup slice is activated
+ExecStartPost=/bin/systemctl start ash-agents.slice
+
+[Install]
+WantedBy=multi-user.target

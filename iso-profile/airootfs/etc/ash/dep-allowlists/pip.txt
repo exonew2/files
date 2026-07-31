@@ -1,0 +1,47 @@
+# pip allowlist — packages permitted for agent-driven installs
+# One package name per line (no version specifiers)
+
+# Core data / ML
+requests
+numpy
+pandas
+scipy
+scikit-learn
+torch
+tensorflow
+
+# Web
+flask
+fastapi
+uvicorn
+aiohttp
+httpx
+
+# Utilities
+click
+rich
+pydantic
+pydantic-settings
+python-dotenv
+tenacity
+tqdm
+
+# AI / embeddings
+openai
+anthropic
+sentence-transformers
+chromadb
+qdrant-client
+
+# Dev tools
+pytest
+ruff
+black
+mypy
+
+# Ash-specific
+inotify_simple
+watchdog
+python-magic
+requests
+aiohttp

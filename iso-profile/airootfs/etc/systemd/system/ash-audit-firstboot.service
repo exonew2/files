@@ -1,0 +1,13 @@
+[Unit]
+Description=Ash Supply Chain Audit — First Boot Setup
+After=local-fs.target auditd.service
+ConditionPathExists=!/var/log/ash/.audit-initialized
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /usr/local/bin/ash-audit-setup install
+ExecStartPost=/bin/touch /var/log/ash/.audit-initialized
+
+[Install]
+WantedBy=multi-user.target

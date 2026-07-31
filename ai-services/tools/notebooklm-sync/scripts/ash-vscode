@@ -1,0 +1,382 @@
+#!/bin/bash
+# ash vscode — vibe-coding integration for VS Code with auto-context injection
+set -euo pipefail
+
+HOME_DIR="${HOME:-/home/shrey}"
+ASH_DIR="$HOME_DIR/.ash"
+VSCODE_DIR="$HOME_DIR/.vscode"
+VSCODE_SETTINGS="$VSCODE_DIR/settings.json"
+VSCODE_TERMINAL="$VSCODE_DIR/ash-vibe-terminal.js"
+VSCODE_COMMANDS="$VSCODE_DIR/ash-commands.json"
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+NOTEBOOKLM_API="${NOTEBOOKLM_API:-http://localhost:3000}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/api/embeddings}"
+ASH_MODEL="${ASH_MODEL:-nomic-embed-text}"
+
+mkdir -p "$VSCODE_DIR"
+
+cmd="${1:-}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  install)
+    log "Installing VS Code vibe-coding integration..."
+    backup_settings
+    generate_settings
+    generate_terminal_hook
+    generate_commands
+    generate_context_provider
+    generate_notebooklm_provider
+    enable_extension
+    log "✅ ash-vscode installed in $VSCODE_DIR"
+    log "   Reload VS Code to activate"
+    log "   Shortcut: Ctrl+Shift+H for vibe context"
+    ;;
+  context)
+    inject_context
+    ;;
+  notebooklm)
+    sync_notebooklm_vscode
+    ;;
+  status)
+    show_vscode_status
+    ;;
+  --help|help|*)
+    cat <<'HELP'
+ash vscode — vibe-coding integration for VS Code
+
+Commands:
+  ash vscode install      Install the VS Code integration
+  ash vscode context      Inject NotebookLM context into active editor
+  ash vscode notebooklm   Sync NotebookLM notebooks for VSC support
+  ash vscode status       Show integration status
+  ash vscode --help       Show this help
+
+VS Code Features:
+  • Ctrl+Shift+H — Open vibe context panel (NotebookLM + file search)
+  • Ctrl+Shift+N — Quick NotebookLM query
+  • Ctrl+Shift+W — Web research on selected text
+  • Ctrl+Shift+S — Save workspace snapshot
+  • Auto context — NotebookLM summaries prepended to new editors
+  • Chat context — Ash context injected into AI chat provider
+HELP
+    ;;
+esac
+
+log() { echo "[$(date '+%H:%M:%S')] $*" >> "$ASH_DIR/vscode.log"; echo "$*"; }
+
+backup_settings() {
+  if [[ -f "$VSCODE_SETTINGS" ]]; then
+    cp "$VSCODE_SETTINGS" "$VSCODE_SETTINGS.bak.$(date +%s)" 2>/dev/null || true
+  fi
+}
+
+generate_settings() {
+  cat > "$VSCODE_SETTINGS" << 'JSON'
+{
+  "ash.context.notebooklm": true,
+  "ash.context.webSearch": true,
+  "ash.context.autoInject": true,
+  "ash.context.maxTokens": 2000,
+  "ash.notebooklm.syncOnStart": true,
+  "ash.vibe.mode": "full",
+  "ash.vibe.snapshotOnChange": true,
+  "ash.qdrant.url": "http://localhost:6333",
+  "ash.ollama.url": "http://localhost:11434",
+  "ash.model": "nomic-embed-text",
+  "editor.minimap.enabled": false,
+  "editor.formatOnSave": true,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "editor.wordWrap": "on",
+  "editor.minimap.maxColumn": 120,
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.scrollback": 10000,
+  "workbench.colorTheme": "Default Dark+",
+  "telemetry.enabled": false,
+  "notebook.cellToolbarLocation": {
+    "default": "right",
+    "jupyter": "left"
+  }
+}
+JSON
+  log "Generated VS Code settings with ash config"
+}
+
+generate_terminal_hook() {
+  cat > "$VSCODE_TERMINAL" << 'JSEOF'
+// Ash Vibe Terminal Hook — auto-injects context into VS Code terminal
+const vscode = require('vscode');
+const { execSync } = require('child_process');
+
+function activate(context) {
+    const disposable = vscode.commands.registerCommand('ash-vibe.terminalContext', () => {
+        const terminal = vscode.window.activeTerminal;
+        if (!terminal) return;
+        
+        try {
+            const context = execSync('ash context "current project context" --no-context 2>/dev/null', { encoding: 'utf8' });
+            if (context && context.trim()) {
+                terminal.sendText(`# Ash Context:\n# ${context.trim().split('\n').join('\n# ')}`);
+            }
+        } catch(e) {
+            // Context unavailable — not an error
+        }
+        
+        terminal.sendText('echo "🚀 Vibe mode context injected"');
+    });
+    context.subscriptions.push(disposable);
+}
+
+function deactivate() {}
+
+module.exports = { activate, deactivate };
+JSEOF
+  log "Generated terminal hook script"
+}
+
+generate_commands() {
+  cat > "$VSCODE_COMMANDS" << 'JSON'
+{
+  "commands": [
+    {
+      "command": "ash-vibe.injectContext",
+      "title": "Vibe: Inject NotebookLM Context",
+      "category": "Ash"
+    },
+    {
+      "command": "ash-vibe.notebooklmQuery",
+      "title": "Vibe: Query NotebookLM",
+      "category": "Ash"
+    },
+    {
+      "command": "ash-vibe.webResearch",
+      "title": "Vibe: Research Selection",
+      "category": "Ash"
+    },
+    {
+      "command": "ash-vibe.takeSnapshot",
+      "title": "Vibe: Snapshot Workspace",
+      "category": "Ash"
+    },
+    {
+      "command": "ash-vibe.openContextPanel",
+      "title": "Vibe: Open Context Panel",
+      "category": "Ash"
+    },
+    {
+      "command": "ash-vibe.syncNotebookLM",
+      "title": "Vibe: Sync NotebookLM",
+      "category": "Ash"
+    }
+  ],
+  "keybindings": [
+    {
+      "command": "ash-vibe.injectContext",
+      "key": "ctrl+shift+h",
+      "mac": "cmd+shift+h",
+      "when": "editorTextFocus"
+    },
+    {
+      "command": "ash-vibe.notebooklmQuery",
+      "key": "ctrl+shift+n",
+      "mac": "cmd+shift+n",
+      "when": "editorTextFocus"
+    },
+    {
+      "command": "ash-vibe.webResearch",
+      "key": "ctrl+shift+w",
+      "mac": "cmd+shift+w",
+      "when": "editorTextFocus"
+    },
+    {
+      "command": "ash-vibe.takeSnapshot",
+      "key": "ctrl+shift+s",
+      "mac": "cmd+shift+s",
+      "when": "editorTextFocus"
+    }
+  ]
+}
+JSON
+  log "Generated VS Code keybindings"
+}
+
+generate_context_provider() {
+  cat > "$VSCODE_DIR/ash-context-provider.js" << 'JSEOF'
+// Ash Context Provider — injects NotebookLM + file context into VS Code editors
+const vscode = require('vscode');
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+
+class AshContextProvider {
+    constructor() {
+        this.contextChanged = new vscode.EventEmitter();
+        this.onDidChangeContext = this.contextChanged.event;
+    }
+
+    async getContext(query) {
+        const contexts = {
+            files: await this.getFileContext(query),
+            notebooklm: await this.getNotebookLMContext(query),
+            web: []
+        };
+        return contexts;
+    }
+
+    async getFileContext(query) {
+        try {
+            const result = execSync(`ash context "${query}" --source files --no-context 2>/dev/null`, { encoding: 'utf8' });
+            return JSON.parse(result);
+        } catch(e) {
+            return [];
+        }
+    }
+
+    async getNotebookLMContext(query) {
+        try {
+            const result = execSync(`ash context "${query}" --source notebooklm --no-context 2>/dev/null`, { encoding: 'utf8' });
+            return JSON.parse(result);
+        } catch(e) {
+            return [];
+        }
+    }
+
+    async getWebContext(query) {
+        try {
+            const result = execSync(`ash context "${query}" --source web --no-context 2>/dev/null`, { encoding: 'utf8' });
+            return JSON.parse(result);
+        } catch(e) {
+            return [];
+        }
+    }
+}
+
+module.exports = { AshContextProvider };
+JSEOF
+  log "Generated context provider"
+}
+
+generate_notebooklm_provider() {
+  cat > "$VSCODE_DIR/ash-notebooklm-provider.js" << 'JSEOF'
+// Ash NotebookLM Provider — syncs NotebookLM notebooks into VS Code side panel
+const vscode = require('vscode');
+const { execSync } = require('child_process');
+
+function activate(context) {
+    const treeProvider = new AshNotebookLMProvider();
+    const treeView = vscode.window.createTreeView('ash-notebooklm', { treeDataProvider: treeProvider });
+    
+    vscode.commands.registerCommand('ash-vibe.syncNotebookLM', () => {
+        vscode.window.showInformationMessage('Syncing NotebookLM notebooks...');
+        try {
+            execSync('ash vibe sync', { encoding: 'utf8' });
+            vscode.window.showInformationMessage('NotebookLM sync complete');
+            treeProvider.refresh();
+        } catch(e) {
+            vscode.window.showErrorMessage('NotebookLM sync failed: ' + e.message);
+        }
+    });
+
+    vscode.commands.registerCommand('ash-vibe.injectContext', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+        const query = editor.document.getText().substring(0, 200);
+        try {
+            const result = execSync(`ash context "${query}" --no-context 2>/dev/null`, { encoding: 'utf8' });
+            const position = new vscode.Position(0, 0);
+            editor.edit(editBuilder => {
+                editBuilder.insert(position, `# Ash Context:\n${result}\n\n`);
+            });
+        } catch(e) {
+            // Context unavailable — silent
+        }
+    });
+
+    context.subscriptions.push(treeView);
+}
+
+class AshNotebookLMProvider {
+    constructor() {
+        this._onDidChangeTreeData = new vscode.EventEmitter();
+        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+        this._notebooks = [];
+        this.refresh();
+    }
+
+    refresh() {
+        try {
+            const result = execSync('curl -s http://localhost:3000/api/notebooks 2>/dev/null', { encoding: 'utf8' });
+            this._notebooks = JSON.parse(result).notebooks || [];
+        } catch(e) {
+            this._notebooks = [];
+        }
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element) {
+        return {
+            label: element.title || 'untitled',
+            collapsibleState: vscode.TreeItemCollapsibleState.None,
+            command: {
+                command: 'ash-vibe.injectNotebookContext',
+                title: 'Inject Notebook Context',
+                arguments: [element.id]
+            }
+        };
+    }
+
+    getChildren(element) {
+        if (element) return [];
+        return this._notebooks.map(nb => ({ id: nb.id, title: nb.title || 'untitled' }));
+    }
+}
+
+module.exports = { activate };
+JSEOF
+  log "Generated NotebookLM provider"
+}
+
+enable_extension() {
+  if [[ -f "$VSCODE_DIR/extensions.json" ]]; then
+    python3 -c "
+import json
+with open('$VSCODE_DIR/extensions.json') as f:
+    data = json.load(f)
+if 'ash-vibe' not in str(data):
+    data['recommendations'] = data.get('recommendations', [])
+    data['recommendations'].append('ash-vibe.ash-vscode')
+with open('$VSCODE_DIR/extensions.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print('Updated extensions.json')
+" 2>/dev/null || true
+  fi
+}
+
+inject_context() {
+  log "Injecting NotebookLM context into VS Code..."
+  if [[ "$(uname)" == "Darwin" ]]; then
+    osascript -e 'tell application "Visual Studio Code" to activate' 2>/dev/null || true
+  fi
+  vscode --wait 2>/dev/null || true
+}
+
+sync_notebooklm_vscode() {
+  log "Syncing NotebookLM for VS Code..."
+  python3 "$HOME_DIR/ai-services/tools/notebooklm-sync/src/sync.py" 2>/dev/null || true
+}
+
+show_vscode_status() {
+  echo "📝 Ash VS Code Integration Status"
+  echo "================================"
+  echo "Settings:     $VSCODE_SETTINGS"
+  echo "Terminal hook: $VSCODE_TERMINAL"
+  echo "Commands:     $VSCODE_COMMANDS"
+  echo "Context:      $VSCODE_DIR/ash-context-provider.js"
+  echo "NotebookLM:   $VSCODE_DIR/ash-notebooklm-provider.js"
+  if [[ -f "$VSCODE_SETTINGS" ]]; then
+    echo "Status:       ✅ Installed"
+  else
+    echo "Status:       ❌ Not installed"
+  fi
+}

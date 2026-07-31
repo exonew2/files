@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "npx",
+      "args": [
+        "notebooklm-mcp-server",
+        "server"
+      ],
+      "env": {}
+    },
+    "ash-project": {
+      "command": "python3",
+      "args": [
+        "/Users/shrey/ash-iso/.opencode/mcp-server/server.py"
+      ],
+      "env": {
+        "ASH_PROJECT_ROOT": "/Users/shrey/ash-iso",
+        "NOTEBOOKLM_NOTEBOOKS": "18deba09-f237-4348-9ad8-68f4f6f859f7",
+        "NOTEBOOKLM_CACHE_DIR": "/Users/shrey/.ash/notebooklm/cache"
+      }
+    },
+    "codebase-memory": {
+      "command": "codebase-memory-mcp",
+      "args": [],
+      "env": {
+        "CBM_MEMORY_PATH": "/Users/shrey/ash-iso/ai-services/data/memory.db"
+      }
+    }
+  }
+}

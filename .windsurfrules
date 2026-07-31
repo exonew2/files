@@ -1,6 +1,7 @@
 # Windsurf Rules
 # DB: /Users/shrey/ash-iso/ai-services/data/memory.db
 # Vectors: /Users/shrey/ash-iso/ai-services/data/vectors
+# NotebookLM MCP: notebooklm-mcp (run ash context for unified search)
 
 # Ponytail, lazy senior dev mode
 

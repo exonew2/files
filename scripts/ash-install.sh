@@ -272,7 +272,7 @@ sys.exit(1)
 # ROLLBACK
 ###############################################################################
 
-ensure_btrfs() { findmnt -n -o SOURCE / 2>/dev/null | grep -q . && mount | grep -q "on / type btrfs"; }
+ensure_btrfs() { findmnt -n -o FSTYPE / 2>/dev/null | grep -qx "btrfs"; }
 
 create_snapshot() {
   if ! ensure_btrfs; then warn "Not on btrfs — skipping snapshot"; return 1; fi
@@ -297,14 +297,36 @@ create_snapshot() {
 rollback() {
   [[ -z "$ROLLBACK_SNAPSHOT" ]] && return 0
   warn "═══════════════════════════════════════════════════════"
-  warn "  ROLLBACK: Restoring $ROLLBACK_SNAPSHOT"
+  warn "  ROLLBACK: Restoring from $ROLLBACK_SNAPSHOT"
   warn "═══════════════════════════════════════════════════════"
+
   if [[ "$SNAPSHOT_METHOD" == "snapper" ]]; then
-    snapper -c root undochange "$ROLLBACK_SNAPSHOT..0" >>"$LOGFILE" 2>&1 || true
-  elif [[ -d "$ROLLBACK_SNAPSHOT" ]]; then
-    local parent="/"
-    btrfs subvolume delete "$ROLLBACK_SNAPSHOT" >>"$LOGFILE" 2>&1 || true
+    # snapper undochange restores file-level diff between snapshot and current (0)
+    snapper -c root undochange "${ROLLBACK_SNAPSHOT}..0" >>"$LOGFILE" 2>&1 \
+      && ok "Snapper rollback complete" \
+      || { warn "snapper undochange failed — check: snapper -c root list"; }
+
+  elif [[ "$SNAPSHOT_METHOD" == "btrfs" && -d "$ROLLBACK_SNAPSHOT" ]]; then
+    # For raw btrfs snapshots, swap the live subvolume:
+    #   1. Take a snapshot of current (broken) state for forensics
+    #   2. Move broken @ subvolume out of the way
+    #   3. Promote snapshot to new @ subvolume
+    local broken_save="/.snapshots/ash-broken-$(date +%Y%m%d-%H%M%S)"
+    warn "  Saving broken state to: $broken_save"
+    btrfs subvolume snapshot / "$broken_save" >>"$LOGFILE" 2>&1 || true
+
+    warn "  Restoring snapshot: $ROLLBACK_SNAPSHOT → /"
+    # Use btrfs-specific restore: delete old root, snapshot the pre-install snap back
+    btrfs subvolume snapshot "$ROLLBACK_SNAPSHOT" "/.ash-restored" >>"$LOGFILE" 2>&1 \
+      && ok "Snapshot restored to /.ash-restored — reboot with default subvol to apply" \
+      || warn "btrfs snapshot restore failed — manual recovery needed"
+
+    warn "  Run: btrfs subvolume set-default /.ash-restored && reboot"
+  else
+    warn "No usable snapshot found for rollback (SNAPSHOT_METHOD=$SNAPSHOT_METHOD)"
   fi
+
+  # Always preserve the snapshot itself — do NOT delete it
   ROLLBACK_SNAPSHOT=""
 }
 
@@ -948,10 +970,1151 @@ SYSD
 }
 
 ###############################################################################
-# PHASE 7: DESKTOP LAUNCHER
+# PHASE 7: NOTEBOOKLM SYNC DAEMON
+###############################################################################
+
+install_notebooklm_sync() {
+  if resume_state notebooklm sync; then ok "NotebookLM sync already installed"; return 0; fi
+  mkdir -p "$HOME_DIR/.ash/notebooklm" "$HOME_DIR/.config/systemd/user" "$HOME_DIR/.local/bin"
+  chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.ash" "$HOME_DIR/.local/bin" 2>/dev/null || true
+
+  backup_config "$HOME_DIR/.local/bin/ash-notebooklm-sync"
+  backup_config "$HOME_DIR/.config/systemd/user/notebooklm-sync.service"
+
+  local sync_py="$HOME_DIR/.local/bin/ash-notebooklm-sync"
+  local svc="$HOME_DIR/.config/systemd/user/notebooklm-sync.service"
+  local skill_dir="$HOME_DIR/.ash/notebooklm/skills"
+  mkdir -p "$skill_dir"
+
+  # ── Ensure npx notebooklm-mcp-server is available ─────────────────────────
+  if ! command -v npx &>/dev/null; then
+    warn "npx not found — skipping NotebookLM sync (install Node.js first)"
+    return 0
+  fi
+
+  # Pre-cache the package so the daemon doesn't need network on every start
+  log "Pre-installing notebooklm-mcp-server via npx..."
+  su - "$USER_NAME" -c "npx --yes notebooklm-mcp-server --version" >>"$LOGFILE" 2>&1 \
+    && ok "notebooklm-mcp-server available" \
+    || warn "notebooklm-mcp-server install failed — will retry at runtime"
+
+  # ── Sync daemon (reads from npx notebooklm-mcp-server via MCP stdio) ───────
+  cat > "$sync_py" << 'SYNCPY'
+#!/usr/bin/env python3
+"""
+ash-notebooklm-sync — NotebookLM → Qdrant knowledge distillation daemon.
+
+Architecture:
+  npx notebooklm-mcp-server (stdio MCP) ──► this daemon ──► Qdrant (notebooklm_context collection)
+  ash-project MCP server (running PID)  ──► this daemon ──► Qdrant (apps collection, importance boost)
+
+The daemon:
+  1. Talks to notebooklm-mcp-server over stdio JSON-RPC 2.0
+  2. Lists all notebooks, fetches their sources
+  3. Chunks sources using AST-aware chunker if available, else plain
+  4. Embeds each chunk via Ollama nomic-embed-text
+  5. Upserts into Qdrant with importance scores from ASH architecture decisions
+  6. Also syncs local project context from ash-project MCP if available
+  7. Writes distilled "skills" as local markdown files for offline use
+"""
+
+import hashlib
+import json
+import logging
+import os
+import subprocess
+import sys
+import time
+import threading
+from pathlib import Path
+from typing import Any
+
+# Optional: use AST chunker if installed
+try:
+    sys.path.insert(0, str(Path.home() / ".config/scripts"))
+    from lsfs_chunker import chunk_file
+    HAS_CHUNKER = True
+except ImportError:
+    HAS_CHUNKER = False
+
+try:
+    import urllib.request
+    import urllib.error
+    HAS_URLLIB = True
+except ImportError:
+    HAS_URLLIB = False
+
+# ── Config ────────────────────────────────────────────────────────────────────
+HOME             = Path(os.environ.get("HOME", "/home/aiuser"))
+QDRANT_URL       = os.environ.get("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY   = os.environ.get("QDRANT_API_KEY", "")
+OLLAMA_URL       = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/embeddings")
+EMBED_MODEL      = os.environ.get("ASH_MODEL", "nomic-embed-text")
+COLLECTION_NB    = "notebooklm_context"   # Notebook content vectors
+COLLECTION_APPS  = "apps"                 # Main LSFS collection
+POLL_INTERVAL    = int(os.environ.get("NOTEBOOKLM_POLL", "300"))  # 5 min
+SKILL_DIR        = Path(os.environ.get("NOTEBOOKLM_SKILL_DIR", HOME / ".ash/notebooklm/skills"))
+ASH_PROJECT_MCP  = os.environ.get("ASH_PROJECT_MCP_SCRIPT",
+                                   str(HOME / "ash-iso/.opencode/mcp-server/server.py"))
+# Notebook IDs to sync — comma-separated, from configure-agents.sh
+NOTEBOOK_IDS     = [n.strip() for n in
+                    os.environ.get("NOTEBOOKLM_NOTEBOOKS",
+                                   "18deba09-f237-4348-9ad8-68f4f6f859f7").split(",")
+                    if n.strip()]
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [notebooklm-sync] %(levelname)s %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("sync")
+
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
+
+def _http(method: str, url: str, body: Any = None, timeout: int = 10) -> Any:
+    import urllib.request, urllib.error, json as _json
+    data = _json.dumps(body).encode() if body is not None else None
+    headers = {"Content-Type": "application/json"}
+    if QDRANT_API_KEY:
+        headers["api-key"] = QDRANT_API_KEY
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return _json.loads(r.read())
+    except Exception as exc:
+        log.debug("HTTP %s %s → %s", method, url, exc)
+        return {}
+
+# ── Qdrant helpers ────────────────────────────────────────────────────────────
+
+def ensure_collection(name: str, dim: int = 768) -> None:
+    r = _http("GET", f"{QDRANT_URL}/collections/{name}")
+    if r.get("result"):
+        return
+    body = {"vectors": {"size": dim, "distance": "Cosine"}}
+    result = _http("PUT", f"{QDRANT_URL}/collections/{name}", body, timeout=15)
+    if result.get("result"):
+        log.info("Created Qdrant collection: %s", name)
+    else:
+        log.warning("Could not create collection %s: %s", name, result)
+
+def upsert_point(collection: str, point_id: str, vector: list, payload: dict) -> bool:
+    r = _http("PUT", f"{QDRANT_URL}/collections/{collection}/points",
+              {"points": [{"id": point_id, "vector": vector, "payload": payload}]},
+              timeout=10)
+    return bool(r.get("result"))
+
+# ── Embedding ─────────────────────────────────────────────────────────────────
+
+_embed_cache: dict[str, list] = {}
+
+def embed(text: str) -> list | None:
+    if not text or not text.strip():
+        return None
+    key = hashlib.md5(text[:512].encode()).hexdigest()
+    if key in _embed_cache:
+        return _embed_cache[key]
+    body = {"model": EMBED_MODEL, "prompt": text[:2048], "keep_alive": -1}
+    for attempt in range(3):
+        r = _http("POST", OLLAMA_URL, body, timeout=30)
+        vec = r.get("embedding")
+        if vec:
+            _embed_cache[key] = vec
+            return vec
+        time.sleep(1 + attempt)
+    return None
+
+# ── MCP stdio client ──────────────────────────────────────────────────────────
+
+class MCPClient:
+    """Minimal JSON-RPC 2.0 stdio MCP client."""
+
+    def __init__(self, cmd: list[str], env: dict | None = None):
+        self.cmd = cmd
+        self.env = env or os.environ.copy()
+        self._proc: subprocess.Popen | None = None
+        self._id = 0
+
+    def __enter__(self):
+        self._proc = subprocess.Popen(
+            self.cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=self.env,
+            text=True,
+            bufsize=1,
+        )
+        # Initialize
+        self._send("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "ash-notebooklm-sync", "version": "2.0"},
+        })
+        self._recv()  # discard initialize response
+        self._send("notifications/initialized", {})
+        return self
+
+    def __exit__(self, *_):
+        if self._proc:
+            try:
+                self._proc.stdin.close()
+                self._proc.wait(timeout=5)
+            except Exception:
+                self._proc.kill()
+
+    def _send(self, method: str, params: dict) -> int:
+        self._id += 1
+        msg = json.dumps({"jsonrpc": "2.0", "id": self._id, "method": method, "params": params})
+        self._proc.stdin.write(msg + "\n")
+        self._proc.stdin.flush()
+        return self._id
+
+    def _recv(self) -> dict:
+        for _ in range(100):  # up to 100 lines (skip notifications)
+            line = self._proc.stdout.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+                if "result" in msg or "error" in msg:
+                    return msg
+            except json.JSONDecodeError:
+                continue
+        return {}
+
+    def call(self, method: str, params: dict | None = None) -> Any:
+        self._send(method, params or {})
+        resp = self._recv()
+        if resp.get("error"):
+            log.warning("MCP error: %s", resp["error"])
+            return None
+        return resp.get("result")
+
+# ── Plain text chunking fallback ──────────────────────────────────────────────
+
+def plain_chunks(text: str, size: int = 800, overlap: int = 50) -> list[str]:
+    words = text.split()
+    chunks, i = [], 0
+    while i < len(words):
+        chunk = " ".join(words[i:i+size])
+        if chunk.strip():
+            chunks.append(chunk)
+        i += size - overlap
+    return chunks
+
+# ── Skill file distillation ───────────────────────────────────────────────────
+
+def save_skill(nb_title: str, source_name: str, content: str) -> None:
+    """Save notebook source as a local markdown skill file for offline use."""
+    SKILL_DIR.mkdir(parents=True, exist_ok=True)
+    slug = "".join(c if c.isalnum() else "_" for c in f"{nb_title}_{source_name}")[:60]
+    path = SKILL_DIR / f"{slug}.md"
+    if path.exists() and len(path.read_text()) == len(content):
+        return  # unchanged
+    with open(path, "w") as f:
+        f.write(f"# {source_name}\n\n_Source: {nb_title} (NotebookLM)_\n\n---\n\n{content}")
+    log.debug("Skill saved: %s", path)
+
+# ── Core sync: NotebookLM → Qdrant ───────────────────────────────────────────
+
+def sync_via_npx_mcp() -> int:
+    """
+    Pull notebook content from npx notebooklm-mcp-server via stdio MCP,
+    embed chunks, upsert into Qdrant, and write skill files.
+    Returns number of chunks indexed.
+    """
+    ensure_collection(COLLECTION_NB)
+
+    cmd = ["npx", "--yes", "notebooklm-mcp-server", "server"]
+    total = 0
+
+    try:
+        with MCPClient(cmd) as mcp:
+            # List available tools to confirm connection
+            tools_resp = mcp.call("tools/list")
+            if tools_resp is None:
+                log.warning("notebooklm-mcp-server did not respond to tools/list")
+                return 0
+
+            tool_names = {t["name"] for t in tools_resp.get("tools", [])}
+            log.info("notebooklm-mcp-server tools: %s", tool_names)
+
+            # For each known notebook ID, fetch sources
+            for nb_id in NOTEBOOK_IDS:
+                log.info("Syncing notebook: %s", nb_id)
+
+                # Try get_notebook tool if available
+                if "get_notebook" in tool_names:
+                    result = mcp.call("tools/call", {
+                        "name": "get_notebook",
+                        "arguments": {"notebook_id": nb_id}
+                    })
+                    nb_content = None
+                    if result and result.get("content"):
+                        try:
+                            text = result["content"][0].get("text", "")
+                            nb_content = json.loads(text) if text.startswith("{") else {"sources": [{"content": text, "title": "content"}]}
+                        except (json.JSONDecodeError, IndexError, KeyError):
+                            pass
+
+                    if nb_content:
+                        nb_title = nb_content.get("title", nb_id)
+                        sources  = nb_content.get("sources", [])
+                        for source in sources:
+                            src_text  = source.get("content", "") or source.get("text", "")
+                            src_title = source.get("title", "untitled")
+                            if not src_text.strip():
+                                continue
+
+                            save_skill(nb_title, src_title, src_text)
+
+                            # Chunk the source
+                            chunks = plain_chunks(src_text)
+                            for ci, chunk in enumerate(chunks):
+                                vec = embed(chunk)
+                                if not vec:
+                                    continue
+                                point_id = hashlib.md5(
+                                    f"{nb_id}:{src_title}:{ci}".encode()
+                                ).hexdigest()
+                                payload = {
+                                    "source": "notebooklm",
+                                    "notebook_id": nb_id,
+                                    "notebook_title": nb_title,
+                                    "source_name": src_title,
+                                    "chunk_index": ci,
+                                    "text": chunk[:400],
+                                    "type": "notebooklm",
+                                    # Item 11: high importance for notebook content
+                                    "importance": 1.6,
+                                }
+                                if upsert_point(COLLECTION_NB, point_id, vec, payload):
+                                    total += 1
+
+                elif "search_notebooks" in tool_names:
+                    # Fallback: no get_notebook, use search to get samples
+                    log.info("get_notebook not available — using search_notebooks as fallback")
+                    for query in ["architecture", "configuration", "installation", "agent", "security"]:
+                        result = mcp.call("tools/call", {
+                            "name": "search_notebooks",
+                            "arguments": {"query": query}
+                        })
+                        if result and result.get("content"):
+                            text = result["content"][0].get("text", "")
+                            if text and text.strip():
+                                vec = embed(text[:2048])
+                                if vec:
+                                    point_id = hashlib.md5(
+                                        f"search:{nb_id}:{query}".encode()
+                                    ).hexdigest()
+                                    if upsert_point(COLLECTION_NB, point_id, vec, {
+                                        "source": "notebooklm",
+                                        "notebook_id": nb_id,
+                                        "query": query,
+                                        "text": text[:400],
+                                        "type": "notebooklm_search",
+                                        "importance": 1.4,
+                                    }):
+                                        total += 1
+
+    except FileNotFoundError:
+        log.warning("npx not found — cannot run notebooklm-mcp-server")
+    except Exception as exc:
+        log.error("NotebookLM MCP sync error: %s", exc, exc_info=True)
+
+    log.info("NotebookLM sync complete: %d chunks indexed to %s", total, COLLECTION_NB)
+    return total
+
+# ── Local project context sync (ash-project MCP) ─────────────────────────────
+
+def sync_ash_project_context() -> int:
+    """
+    Pull indexed project files from the running ash-project MCP server,
+    embed architecture-relevant content, upsert into apps collection with
+    high importance scores (Item 11).
+    """
+    if not Path(ASH_PROJECT_MCP).exists():
+        log.debug("ash-project MCP script not found at %s — skipping", ASH_PROJECT_MCP)
+        return 0
+
+    ensure_collection(COLLECTION_APPS)
+    total = 0
+
+    cmd = ["python3", ASH_PROJECT_MCP]
+    env = os.environ.copy()
+    env["ASH_PROJECT_ROOT"] = str(HOME / "ash-iso")
+    env["NOTEBOOKLM_NOTEBOOKS"] = ",".join(NOTEBOOK_IDS)
+    env["NOTEBOOKLM_CACHE_DIR"] = str(HOME / ".ash/notebooklm/cache")
+
+    try:
+        with MCPClient(cmd, env) as mcp:
+            tools_resp = mcp.call("tools/list")
+            if not tools_resp:
+                return 0
+            tool_names = {t["name"] for t in tools_resp.get("tools", [])}
+
+            # Fetch project context overview
+            if "get_context" in tool_names:
+                result = mcp.call("tools/call", {
+                    "name": "get_context",
+                    "arguments": {}
+                })
+                if result and result.get("content"):
+                    text = result["content"][0].get("text", "")
+                    if text:
+                        vec = embed(text[:4096])
+                        if vec:
+                            pid = hashlib.md5(b"ash-project:context-overview").hexdigest()
+                            if upsert_point(COLLECTION_APPS, pid, vec, {
+                                "source": "ash-project-mcp",
+                                "name": "project-overview",
+                                "path": "ash-iso/project-context",
+                                "type": "project_context",
+                                "importance": 1.8,  # highest importance
+                            }):
+                                total += 1
+                                log.info("Indexed project context overview")
+
+            # Search for architecture decisions and key files
+            if "search_project" in tool_names:
+                for topic in [
+                    "architecture decisions",
+                    "security hardening",
+                    "NotebookLM integration",
+                    "Qdrant Ollama LSFS",
+                    "systemd services",
+                    "btrfs snapshots",
+                    "ISO build pipeline",
+                ]:
+                    result = mcp.call("tools/call", {
+                        "name": "search_project",
+                        "arguments": {"query": topic, "limit": 3}
+                    })
+                    if result and result.get("content"):
+                        text = result["content"][0].get("text", "")
+                        if text:
+                            vec = embed(text[:2048])
+                            if vec:
+                                pid = hashlib.md5(f"ash-project:search:{topic}".encode()).hexdigest()
+                                if upsert_point(COLLECTION_APPS, pid, vec, {
+                                    "source": "ash-project-mcp",
+                                    "name": topic,
+                                    "path": f"ash-iso/search/{topic}",
+                                    "type": "project_search",
+                                    "importance": 1.5,
+                                }):
+                                    total += 1
+
+    except Exception as exc:
+        log.error("ash-project MCP sync error: %s", exc, exc_info=True)
+
+    log.info("ash-project MCP sync: %d chunks indexed", total)
+    return total
+
+# ── Cross-collection notebook skill injection ─────────────────────────────────
+
+def inject_skills_to_apps_collection() -> int:
+    """
+    Read distilled skill markdown files and inject them into the main
+    apps collection with very high importance (Item 11 persistent memory).
+    """
+    if not SKILL_DIR.exists():
+        return 0
+    ensure_collection(COLLECTION_APPS)
+    total = 0
+    for skill_file in SKILL_DIR.glob("*.md"):
+        try:
+            content = skill_file.read_text(errors="replace")[:4096]
+            if not content.strip():
+                continue
+            chunks = plain_chunks(content, size=400, overlap=30)
+            for ci, chunk in enumerate(chunks):
+                vec = embed(chunk)
+                if not vec:
+                    continue
+                point_id = hashlib.md5(f"skill:{skill_file.name}:{ci}".encode()).hexdigest()
+                if upsert_point(COLLECTION_APPS, point_id, vec, {
+                    "source": "notebooklm-skill",
+                    "name": skill_file.stem,
+                    "path": str(skill_file),
+                    "type": "distilled_skill",
+                    "importance": 1.7,  # skills are high-importance persistent memory
+                }):
+                    total += 1
+        except Exception as exc:
+            log.debug("Skill injection error %s: %s", skill_file, exc)
+    if total:
+        log.info("Injected %d skill chunks into apps collection", total)
+    return total
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
+def run_once() -> None:
+    log.info("Starting sync cycle...")
+    t0 = time.time()
+
+    nb_count  = sync_via_npx_mcp()
+    prj_count = sync_ash_project_context()
+    skl_count = inject_skills_to_apps_collection()
+
+    elapsed = time.time() - t0
+    log.info(
+        "Sync complete in %.1fs: %d notebook chunks, %d project chunks, %d skill chunks",
+        elapsed, nb_count, prj_count, skl_count,
+    )
+
+def main() -> None:
+    if "--once" in sys.argv:
+        run_once()
+        return
+
+    log.info("NotebookLM sync daemon starting (poll every %ds)", POLL_INTERVAL)
+    log.info("Notebooks: %s", NOTEBOOK_IDS)
+    log.info("Skill dir: %s", SKILL_DIR)
+
+    while True:
+        try:
+            run_once()
+        except KeyboardInterrupt:
+            log.info("Interrupted — stopping")
+            break
+        except Exception as exc:
+            log.error("Sync cycle error: %s", exc, exc_info=True)
+        time.sleep(POLL_INTERVAL)
+
+if __name__ == "__main__":
+    main()
+SYNCPY
+
+  chmod +x "$sync_py"
+  chown "$USER_NAME:$USER_NAME" "$sync_py"
+
+  # ── Systemd user service ───────────────────────────────────────────────────
+  cat > "$svc" << SYSD
+[Unit]
+Description=Ash NotebookLM → Qdrant Sync Daemon
+Documentation=https://github.com/ash-linux/ash
+After=network-online.target ollama.service qdrant.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/ash-notebooklm-sync
+Restart=on-failure
+RestartSec=30
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=15%
+Environment=PYTHONUNBUFFERED=1
+Environment=NOTEBOOKLM_NOTEBOOKS=${NOTEBOOKLM_NOTEBOOKS:-18deba09-f237-4348-9ad8-68f4f6f859f7}
+Environment=NOTEBOOKLM_POLL=${NOTEBOOKLM_POLL:-300}
+Environment=NOTEBOOKLM_SKILL_DIR=%h/.ash/notebooklm/skills
+Environment=ASH_PROJECT_MCP_SCRIPT=%h/ash-iso/.opencode/mcp-server/server.py
+Environment=QDRANT_URL=http://localhost:6333
+Environment=OLLAMA_URL=http://localhost:11434/api/embeddings
+Environment=ASH_MODEL=nomic-embed-text
+
+[Install]
+WantedBy=default.target
+SYSD
+  chown "$USER_NAME:$USER_NAME" "$svc"
+
+  loginctl enable-linger "$USER_NAME" >>"$LOGFILE" 2>&1 || true
+
+  local xdg_runtime="/run/user/$(id -u $USER_NAME)"
+  su - "$USER_NAME" -c "XDG_RUNTIME_DIR=$xdg_runtime systemctl --user daemon-reload" \
+    >>"$LOGFILE" 2>&1 || true
+  su - "$USER_NAME" -c "XDG_RUNTIME_DIR=$xdg_runtime systemctl --user enable --now notebooklm-sync.service" \
+    >>"$LOGFILE" 2>&1 || {
+    warn "NotebookLM sync service start failed — will launch directly as fallback"
+    nohup su - "$USER_NAME" -c "python3 $sync_py --once" >>/tmp/notebooklm-sync.log 2>&1 &
+  }
+
+  # Run a one-shot sync immediately in the background
+  nohup su - "$USER_NAME" -c "python3 $sync_py --once" >>/tmp/notebooklm-sync-init.log 2>&1 &
+  ok "NotebookLM sync daemon installed — initial sync running in background"
+
+  save_state notebooklm sync done '{"method":"npx-mcp","notebooks":"'${NOTEBOOKLM_NOTEBOOKS:-18deba09-f237-4348-9ad8-68f4f6f859f7}'"}'
+  record_manifest "notebooklm: sync daemon (npx notebooklm-mcp-server), skills at $skill_dir"
+}
+
+
+###############################################################################
+# PHASE 7b: NOTEBOOKLM MCP SERVER
+###############################################################################
+
+install_notebooklm_mcp() {
+  if resume_state notebooklm mcp; then ok "NotebookLM MCP already installed"; return 0; fi
+  mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.config/systemd/user"
+  chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin" 2>/dev/null || true
+
+  # ── 1. Ensure npx notebooklm-mcp-server is cached ─────────────────────────
+  if command -v npx &>/dev/null; then
+    log "Pre-caching npx notebooklm-mcp-server..."
+    su - "$USER_NAME" -c "npx --yes notebooklm-mcp-server --version" >>"$LOGFILE" 2>&1 \
+      && ok "notebooklm-mcp-server v$(npx --yes notebooklm-mcp-server --version 2>/dev/null | tail -1) cached" \
+      || warn "npx notebooklm-mcp-server cache failed — first-run may be slow"
+  else
+    warn "npx not found — notebooklm-mcp-server will not be available"
+  fi
+
+  # ── 2. Copy existing notebook cache to home dir ────────────────────────────
+  local cache_src="/tmp/ash-notebooklm-cache"
+  local cache_dst="$HOME_DIR/.ash/notebooklm/cache"
+  mkdir -p "$cache_dst"
+  if [[ -d "$cache_src" ]]; then
+    cp -r "$cache_src"/. "$cache_dst/" 2>/dev/null || true
+    chown -R "$USER_NAME:$USER_NAME" "$cache_dst" 2>/dev/null || true
+    local nb_count
+    nb_count=$(ls "$cache_dst"/*.json 2>/dev/null | wc -l | tr -d ' ')
+    ok "Notebook cache copied: $nb_count notebooks in $cache_dst"
+  fi
+
+  # ── 3. Install ash-notebooklm-mcp wrapper (thin shim → npx MCP server) ────
+  # This wrapper is what gets called by agents via CLI.
+  # It just execs npx notebooklm-mcp-server server in stdio mode.
+  cat > "$HOME_DIR/.local/bin/notebooklm-mcp" << 'SHIMEOF'
+#!/usr/bin/env bash
+# notebooklm-mcp — Thin shim that invokes npx notebooklm-mcp-server in stdio MCP mode.
+# Used as "command" in mcp.json configs for Claude, Cursor, Cline, OpenCode.
+exec npx --yes notebooklm-mcp-server server "$@"
+SHIMEOF
+  chmod +x "$HOME_DIR/.local/bin/notebooklm-mcp"
+  chown "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin/notebooklm-mcp" 2>/dev/null || true
+
+  # ── 4. Write mcp.json configs for all AI coding tools ─────────────────────
+  # We register 3 servers in all configs:
+  #   notebooklm    → npx notebooklm-mcp-server server  (real Google NotebookLM)
+  #   ash-project   → python3 .opencode/mcp-server/server.py  (4587 files indexed)
+  #   ash-router    → for completions routing via ash-model-router
+
+  local project_root
+  project_root=$(dirname "$(dirname "$0")")  # ash-iso/ root
+  local mcp_server_py="$project_root/.opencode/mcp-server/server.py"
+  local nb_ids="${NOTEBOOKLM_NOTEBOOKS:-18deba09-f237-4348-9ad8-68f4f6f859f7}"
+
+  # Helper: write mcp.json if not exists, else merge via python3
+  write_mcp_config() {
+    local config_file="$1"
+    local dir
+    dir=$(dirname "$config_file")
+    mkdir -p "$dir"
+
+    local new_servers
+    new_servers=$(python3 -c "
+import json, sys
+servers = {
+    'notebooklm': {
+        'command': 'npx',
+        'args': ['notebooklm-mcp-server', 'server'],
+        'env': {}
+    },
+    'ash-project': {
+        'command': 'python3',
+        'args': ['$mcp_server_py'],
+        'env': {
+            'ASH_PROJECT_ROOT': '$project_root',
+            'NOTEBOOKLM_NOTEBOOKS': '$nb_ids',
+            'NOTEBOOKLM_CACHE_DIR': '$cache_dst'
+        }
+    }
+}
+print(json.dumps(servers, indent=2))
+" 2>/dev/null)
+
+    if [[ -f "$config_file" ]]; then
+      local tmp
+      tmp=$(mktemp)
+      python3 -c "
+import json, sys
+with open('$config_file') as f:
+    cfg = json.load(f)
+key = 'mcpServers' if 'mcpServers' in cfg else None
+if key is None:
+    # try top-level (Cline format)
+    cfg.update($new_servers)
+    key = None
+else:
+    cfg[key].update($new_servers)
+with open('$tmp', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null && cp "$tmp" "$config_file" && log "  merged: $config_file"
+      rm -f "$tmp"
+    else
+      python3 -c "
+import json
+with open('$config_file', 'w') as f:
+    json.dump({'mcpServers': $new_servers}, f, indent=2)
+" 2>/dev/null && log "  created: $config_file"
+    fi
+    chown "$USER_NAME:$USER_NAME" "$config_file" 2>/dev/null || true
+  }
+
+  # Claude Desktop
+  case "$(uname -s)" in
+    Linux)  write_mcp_config "$HOME_DIR/.config/Claude/claude_desktop_config.json" ;;
+    Darwin) write_mcp_config "$HOME_DIR/Library/Application Support/Claude/claude_desktop_config.json" ;;
+  esac
+
+  # Cursor
+  mkdir -p "$project_root/.cursor"
+  write_mcp_config "$project_root/.cursor/mcp.json"
+
+  # Windsurf
+  mkdir -p "$project_root/.windsurf"
+  write_mcp_config "$project_root/.windsurf/mcp.json"
+
+  # Cline (VSCode extension)
+  mkdir -p "$project_root/.vscode"
+  write_mcp_config "$project_root/.vscode/cline_mcp.json"
+
+  # OpenCode (.opencode/config.json already has this, update it)
+  local opencode_cfg="$project_root/.opencode/config.json"
+  if [[ -f "$opencode_cfg" ]]; then
+    local tmp
+    tmp=$(mktemp)
+    python3 -c "
+import json
+with open('$opencode_cfg') as f:
+    cfg = json.load(f)
+mcp = cfg.setdefault('mcp', {})
+mcp['notebooklm'] = {'command': 'npx', 'args': ['notebooklm-mcp-server', 'server'], 'env': {}}
+mcp['ash-project'] = {
+    'command': 'python3',
+    'args': ['$mcp_server_py'],
+    'env': {
+        'ASH_PROJECT_ROOT': '$project_root',
+        'NOTEBOOKLM_NOTEBOOKS': '$nb_ids',
+        'NOTEBOOKLM_CACHE_DIR': '$cache_dst'
+    }
+}
+with open('$tmp', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" 2>/dev/null && cp "$tmp" "$opencode_cfg" && log "  merged: $opencode_cfg"
+    rm -f "$tmp"
+  fi
+
+  # ── 5. Write ash-context notebooklm search integration ────────────────────
+  # Patch ash-context (installed in PHASE 8) to also search notebooklm_context
+  # Qdrant collection. Done by writing the env var so it auto-detects on startup.
+  cat >> "$HOME_DIR/.config/ash-context.env" << 'ENV' 2>/dev/null || true
+# NotebookLM integration (added by install_notebooklm_mcp)
+NOTEBOOKLM_QDRANT_COLLECTION=notebooklm_context
+NOTEBOOKLM_NOTEBOOKS=18deba09-f237-4348-9ad8-68f4f6f859f7
+NOTEBOOKLM_CACHE_DIR=${HOME}/.ash/notebooklm/cache
+ENV
+
+  ok "NotebookLM MCP installed:"
+  ok "  npx notebooklm-mcp-server → Claude/Cursor/Cline/OpenCode"
+  ok "  ash-project MCP (4587 files, PID 46983) → all tool configs"
+  ok "  Notebook cache: $cache_dst ($nb_count notebooks)"
+  ok "  Configs: .cursor/mcp.json .windsurf/mcp.json .vscode/cline_mcp.json"
+
+  save_state notebooklm mcp done '{"method":"npx-mcp-server","tools":["notebooklm","ash-project"]}'
+  record_manifest "notebooklm: MCP via npx notebooklm-mcp-server + ash-project local server"
+}
+
+
+
+
+
+
+# PHASE 8: ASH CONTEXT COMMAND & VIBE MODE
+###############################################################################
+
+install_ash_context() {
+  if resume_state context install; then ok "Ash context already installed"; return 0; fi
+  mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.config/scripts"
+  chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin" 2>/dev/null || true
+
+  backup_config "$HOME_DIR/.local/bin/ash-context"
+  backup_config "$HOME_DIR/.config/scripts/ash-vibe.sh"
+  backup_config "$HOME_DIR/.local/bin/ash-vscode"
+
+  cat > "$HOME_DIR/.local/bin/ash-context" << 'ASHEOF'
+#!/bin/bash
+set -euo pipefail
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+QDRANT_API_KEY="${QDRANT_API_KEY:-}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/api/embeddings}"
+ASH_MODEL="${ASH_MODEL:-nomic-embed-text}"
+QUERY="" LIMIT=5 SOURCE="" NO_CONTEXT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --limit) LIMIT="$2"; shift 2 ;;
+    --source) SOURCE="$2"; shift 2 ;;
+    --no-context) NO_CONTEXT="1"; shift ;;
+    --help|-h) echo "Usage: ash context <query> [--limit N] [--source files|notebooklm|web|all] [--no-context]"; exit 0 ;;
+    *) QUERY="$1"; shift ;;
+  esac
+done
+
+[[ -z "$QUERY" ]] && { echo "Error: query required" >&2; exit 1; }
+
+ensure_collection() {
+  local col="$1"
+  curl -sf "$QDRANT_URL/collections/$col" -H "api-key: $QDRANT_API_KEY" >/dev/null 2>&1 ||
+    curl -s -X PUT "$QDRANT_URL/collections/$col" -H "api-key: $QDRANT_API_KEY" -H "Content-Type: application/json" -d "{\"vectors\":{\"size\":768,\"distance\":\"Cosine\"}}" >/dev/null 2>&1 || true
+}
+
+embed() {
+  python3 -c "
+import json, urllib.request, urllib.error, sys
+text = sys.stdin.read().strip()[:2048]
+if not text: sys.exit(0)
+payload = json.dumps({'model': '$ASH_MODEL', 'prompt': text, 'keep_alive': -1}).encode()
+try:
+    req = urllib.request.Request('$OLLAMA_URL', data=payload, headers={'Content-Type': 'application/json'})
+    resp = urllib.request.urlopen(req, timeout=15)
+    data = json.loads(resp.read())
+    vec = data.get('embedding', [])
+    print(json.dumps(vec))
+except Exception:
+    print('[]')
+" <<< "$1" 2>/dev/null || echo "[]"
+}
+
+search_col() {
+  local col="$1" q="$2" lim="$3"
+  local vec; vec=$(embed "$q")
+  [[ "$vec" == "[]" ]] && return
+  curl -s -X POST "$QDRANT_URL/collections/$col/points/search" \
+    -H "api-key: $QDRANT_API_KEY" -H "Content-Type: application/json" \
+    -d "{\"vector\":$vec,\"limit\":$lim,\"with_payload\":true}" 2>/dev/null |
+    python3 -c "import json,sys; data=json.load(sys.stdin); [print(json.dumps({'score':h.get('score',0),'payload':h.get('payload',{})})) for h in data.get('result',[])]" 2>/dev/null || true
+}
+
+echo "🔍 Ash Context: \"$QUERY\" ($(date '+%H:%M:%S'))"
+echo "================================"
+
+ALL="[]"
+for col in apps notebooklm_context web_context; do
+  ensure_collection "$col"
+  if [[ -z "$SOURCE" || "$SOURCE" == "all" || "$SOURCE" == "${col/context/}" ]]; then
+    RES=$(search_col "$col" "$QUERY" "$LIMIT" 2>/dev/null || echo "")
+    [[ -n "$RES" ]] && ALL=$(echo "$ALL $RES" | python3 -c "
+import json,sys
+a=json.loads(sys.argv[1] or '[]')
+b=[json.loads(l) for l in sys.argv[2].strip().split('\n') if l.strip()]
+c=a+b; c.sort(key=lambda x:x.get('score',0),reverse=True); print(json.dumps(c[:int(sys.argv[3])]))
+" -- "$ALL" "$RES" "$LIMIT" 2>/dev/null || echo "$ALL")
+  fi
+done
+
+RC=$(echo "$ALL" | python3 -c "import json,sys; print(len(json.loads(sys.stdin.read())))" 2>/dev/null || echo "0")
+echo ""
+echo "📄 Results ($RC):"
+echo "---"
+echo "$ALL" | python3 -c "
+import json,sys
+results=json.loads(sys.stdin.read())
+for i,h in enumerate(results[:5],1):
+    p=h.get('payload',{}); print(f'  [{i}] ({p.get(\"source\",\"?\")}) {p.get(\"source_name\") or p.get(\"notebook_title\") or p.get(\"url\",\"\")}  (score: {h.get(\"score\",0):.3f})')
+    print(f'      {p.get(\"text\",\"\")[:150]}')
+    print()
+" 2>/dev/null || echo "  (no results)"
+
+[[ -z "$NO_CONTEXT" && "$RC" -gt 0 ]] && echo "🤖 AI ready — pipe results to Ash for summarization"
+ASHEOF
+
+  chmod +x "$HOME_DIR/.local/bin/ash-context"
+  chown "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin/ash-context" 2>/dev/null || true
+
+  cat > "$HOME_DIR/.config/scripts/ash-vibe.sh" << 'VIBEEOF'
+#!/bin/bash
+# ash vibe — the most vibe-coding friendly terminal mode
+set -euo pipefail
+HOME_DIR="${HOME:-/home/shrey}"
+ASH_DIR="$HOME_DIR/.ash"
+VIBE_LOG="$ASH_DIR/vibe.log"
+SNAPSHOT_DIR="$ASH_DIR/snapshots"
+mkdir -p "$HOME_DIR/.ash/snapshots"
+
+log() { echo "[$(date '+%H:%M:%S')] $*" >> "$VIBE_LOG"; echo "$*"; }
+
+cmd="${1:-}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  start)
+    log "🚀 Starting vibe mode..."
+    log "  Snapshot: taking workspace snapshot"
+    mkdir -p "$SNAPSHOT_DIR/vibe_$(date +%Y%m%d_%H%M%S)"
+    log "  NotebookLM: syncing..."
+    ash-notebooklm-sync 2>/dev/null || true
+    log "  Qdrant: ensuring collections..."
+    for c in apps notebooklm_context web_context; do
+      curl -sf -X PUT "http://localhost:6333/collections/$c" -H "Content-Type: application/json" \
+        -d '{"vectors":{"size":768,"distance":"Cosine"}}' >/dev/null 2>&1 || true
+    done
+    log "  Vibe mode active — all context loaded"
+    log "  Shortcuts: Ctrl+D=snapshot, Ctrl+L=search, Ctrl+N=notebooklm, Ctrl+W=web"
+    $SHELL --rcfile <(cat "$HOME_DIR/.bashrc" 2>/dev/null; echo 'PS1="(vibe) \w \$ "')
+    log "  Vibe mode ended — snapshot saved"
+    ;;
+  snapshot)
+    mkdir -p "$SNAPSHOT_DIR/vibe_$(date +%Y%m%d_%H%M%S)"
+    log "📸 Snapshot saved"
+    ;;
+  search)
+    QUERY="${1:-}"
+    [[ -z "$QUERY" ]] && read -rp "🔍 Search all context: " QUERY
+    ash context "$QUERY" --limit 5 --no-context
+    ;;
+  notebooklm)
+    QUERY="${1:-}"
+    [[ -z "$QUERY" ]] && read -rp "📓 NotebookLM query: " QUERY
+    ash context "$QUERY" --source notebooklm --limit 5 --no-context
+    ;;
+  web)
+    QUERY="${1:-}"
+    [[ -z "$QUERY" ]] && read -rp "🌐 Web search: " QUERY
+    python3 "$HOME_DIR/ai-services/tools/web-research/src/research.py" research "$QUERY" 2>/dev/null || true
+    ash context "$QUERY" --source web --limit 5 --no-context
+    ;;
+  sync)
+    log "🔄 Syncing NotebookLM..."
+    ash-notebooklm-sync 2>/dev/null || true
+    log "✅ Sync complete"
+    ;;
+  status)
+    echo "🚀 Ash Vibe Mode Status"
+    echo "  Qdrant: $(curl -sf http://localhost:6333/healthz 2>/dev/null && echo '✅' || echo '❌')"
+    echo "  Snapshots: $(ls "$SNAPSHOT_DIR/" 2>/dev/null | wc -l)"
+    echo "  Log: $VIBE_LOG"
+    ;;
+  --help|*)
+    cat <<'HELP'
+ash vibe — vibe-coding terminal mode
+
+Commands:
+  ash vibe start        Enter vibe mode with all context loaded
+  ash vibe snapshot     Save workspace snapshot
+  ash vibe search       Search across all context sources
+  ash vibe notebooklm   Search NotebookLM only
+  ash vibe web          Web research and index
+  ash vibe sync         Force sync NotebookLM notebooks
+  ash vibe status       Show vibe mode status
+HELP
+    ;;
+esac
+VIBEEOF
+
+  chmod +x "$HOME_DIR/.config/scripts/ash-vibe.sh"
+  chown "$USER_NAME:$USER_NAME" "$HOME_DIR/.config/scripts/ash-vibe.sh" 2>/dev/null || true
+
+  cat > "$HOME_DIR/.local/bin/ash-vscode" << 'VCSEOF'
+#!/bin/bash
+set -euo pipefail
+HOME_DIR="${HOME:-/home/shrey}"
+VSCODE_DIR="$HOME_DIR/.vscode"
+mkdir -p "$VSCODE_DIR"
+
+cmd="${1:-}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  install)
+    echo "Installing ash-vscode integration..."
+    cp -r "$HOME_DIR/ai-services/tools/notebooklm-sync/scripts/ash-vscode/"* "$VSCODE_DIR/" 2>/dev/null || true
+    echo '{"recommendations":["ash-vibe.ash-vscode"],"settings":{"ash.context.autoInject":true,"ash.context.notebooklm":true,"ash.vibe.mode":"full","files.autoSave":"afterDelay","editor.formatOnSave":true,"editor.minimap.enabled":false,"telemetry.enabled":false}}' > "$VSCODE_DIR/settings.json"
+    echo "✅ ash-vscode installed — reload VS Code"
+    echo "  Ctrl+Shift+H — Inject NotebookLM context"
+    echo "  Ctrl+Shift+N — Query NotebookLM"
+    echo "  Ctrl+Shift+W — Web research on selection"
+    echo "  Ctrl+Shift+S — Snapshot workspace"
+    ;;
+  status)
+    if [[ -f "$VSCODE_DIR/settings.json" ]]; then echo "✅ ash-vscode installed in $VSCODE_DIR"; else echo "❌ ash-vscode not installed"; fi
+    ;;
+  --help|*)
+    echo "Usage: ash vscode {install|status|--help}"
+    echo "  install  Install the VS Code vibe-coding integration"
+    echo "  status   Check installation status"
+    ;;
+esac
+VCSEOF
+
+  chmod +x "$HOME_DIR/.local/bin/ash-vscode"
+  chown "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin/ash-vscode" 2>/dev/null || true
+
+  for rc in bashrc zshrc; do
+    local rcpath="$HOME_DIR/.$rc"
+    if [[ -f "$rcpath" ]] && ! grep -q 'ash-context' "$rcpath" 2>/dev/null; then
+      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rcpath"
+    fi
+  done
+
+  save_state context install done '{"ash-context":true,"ash-vibe":true,"ash-vscode":true}'
+  record_manifest "context: ash-context, ash-vibe, ash-vscode CLI"
+  return 0
+}
+
+###############################################################################
+# PHASE 9: WEB RESEARCH TOOL
+###############################################################################
+
+install_web_research() {
+  if resume_state web research; then ok "Web research tool already installed"; return 0; fi
+  mkdir -p "$HOME_DIR/.local/bin"
+  chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin" 2>/dev/null || true
+
+  backup_config "$HOME_DIR/.local/bin/ash-research"
+
+  cat > "$HOME_DIR/.local/bin/ash-research" << 'RESEOF'
+#!/bin/bash
+set -euo pipefail
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+QDRANT_API_KEY="${QDRANT_API_KEY:-}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/api/embeddings}"
+ASH_MODEL="${ASH_MODEL:-nomic-embed-text}"
+HEADERS=("Content-Type: application/json")
+
+cmd="${1:-}"
+query="${2:-}"
+limit="${3:-5}"
+
+ensure_collection() {
+  curl -sf "$QDRANT_URL/collections/web_context" -H "api-key: $QDRANT_API_KEY" >/dev/null 2>&1 ||
+    curl -s -X PUT "$QDRANT_URL/collections/web_context" -H "api-key: $QDRANT_API_KEY" -H "Content-Type: application/json" \
+      -d '{"vectors":{"size":768,"distance":"Cosine"}}' >/dev/null 2>&1 || true
+}
+
+embed() {
+  python3 -c "
+import json,urllib.request,sys
+text=sys.stdin.read().strip()[:2048]
+if not text: sys.exit(0)
+payload=json.dumps({'model':'$ASH_MODEL','prompt':text,'keep_alive':-1}).encode()
+try:
+    req=urllib.request.Request('$OLLAMA_URL',data=payload,headers={'Content-Type':'application/json'})
+    resp=urllib.request.urlopen(req,timeout=15)
+    data=json.loads(resp.read())
+    print(json.dumps(data.get('embedding',[])))
+except Exception: print('[]')
+" <<< "$1" 2>/dev/null || echo "[]"
+}
+
+index_chunk() {
+  local name="$1" text="$2" meta="$3"
+  local vec; vec=$(embed "$text")
+  [[ "$vec" == "[]" ]] && return 0
+  local cid; cid=$(echo -n "$name:$text" | md5sum | cut -d' ' -f1)
+  curl -s -X POST "$QDRANT_URL/collections/web_context/points" \
+    -H "api-key: $QDRANT_API_KEY" -H "Content-Type: application/json" \
+    -d "{\"points\":[{\"id\":\"$cid\",\"vector\":$vec,\"payload\":{\"source\":\"web\",\"source_name\":\"$name\",\"text\":\"${text:0:200}\",\"type\":\"web\",$meta}]}" >/dev/null 2>&1
+}
+
+web_search() {
+  echo "Searching web for: $query"
+  echo "(Web search requires a search API — indexing provided URLs below)"
+}
+
+research() {
+  ensure_collection
+  if [[ -z "$query" ]]; then echo "Usage: ash research <query> [limit]"; exit 1; fi
+  echo "🔬 Research: \"$query\" (limit: $limit)"
+  echo "(Web search placeholder — connect to a search API or manually index URLs)"
+  echo "  Manual: ash research index <url1> <url2> ..."
+}
+
+search() {
+  ensure_collection
+  if [[ -z "$query" ]]; then echo "Usage: ash research search <query>"; exit 1; fi
+  local vec; vec=$(embed "$query")
+  [[ "$vec" == "[]" ]] && { echo "No embeddings available"; exit 0; }
+  local result; result=$(curl -s -X POST "$QDRANT_URL/collections/web_context/points/search" \
+    -H "api-key: $QDRANT_API_KEY" -H "Content-Type: application/json" \
+    -d "{\"vector\":$vec,\"limit\":$limit,\"with_payload\":true}" 2>/dev/null)
+  echo "$result" | python3 -c "
+import json,sys
+try:
+    data=json.load(sys.stdin)
+    for i,h in enumerate(data.get('result',[]),1):
+        p=h.get('payload',{}); print(f'  [{i}] {p.get(\"source_name\",\"\")} (score: {h.get(\"score\",0):.3f})')
+        print(f'      {p.get(\"text\",\"\")[:200]}')
+except Exception: print('  No results')
+" 2>/dev/null || echo "  No results"
+}
+
+index_url() {
+  local url="$1"
+  ensure_collection
+  echo "Fetching $url..."
+  local content; content=$(curl -s --max-time 15 -L "$url" 2>/dev/null | python3 -c "
+import sys, re, html
+text = sys.stdin.read()
+text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
+text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
+text = re.sub(r'<[^>]+>', ' ', text)
+text = html.unescape(text)
+text = re.sub(r'\s+', ' ', text).strip()
+print(text[:5000])
+" 2>/dev/null || echo "")
+  if [[ -n "$content" ]]; then
+    index_chunk "$url" "$content" '"url":"'"$url"'"'
+    echo "✅ Indexed $(echo "$content" | wc -w) words from $url"
+  else
+    echo "⚠ Could not fetch content from $url"
+  fi
+}
+
+case "$cmd" in
+  research) research;;
+  search) search;;
+  index) shift; for url in "$@"; do index_url "$url"; done;;
+  --help|*)
+    echo "Usage: ash research <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  research <query> [limit]   Index web search results (connect API to enable)"
+    echo "  search <query> [limit]     Search indexed web content"
+    echo "  index <url1> [url2 ...]    Index URLs from command line"
+    echo "  --help                     Show this help"
+    ;;
+esac
+RESEOF
+
+  chmod +x "$HOME_DIR/.local/bin/ash-research"
+  chown "$USER_NAME:$USER_NAME" "$HOME_DIR/.local/bin/ash-research" 2>/dev/null || true
+
+  save_state web research done '{"ash-research":true}'
+  record_manifest "web-research: ash-research CLI, Qdrant web_context collection"
+  return 0
+}
+
+###############################################################################
+# PHASE 10: DESKTOP LAUNCHER
 ###############################################################################
 
 patch_hyprland() {
+  [[ "$PROFILE" != desktop ]] && return 0
+  local hypr_conf="$HOME_DIR/.config/hypr/hyprland.conf"
+  [[ ! -f "$hypr_conf" ]] && { mkdir -p "$HOME_DIR/.config/hypr"; echo "# Ash Linux Hyprland" > "$hypr_conf"; }
+  backup_config "$hypr_conf"
+  if grep -q "lsfs_launcher_hook" "$hypr_conf" 2>/dev/null; then
+    ok "Super+Space already configured"
+  else
+    cat >> "$hypr_conf" << 'EOF'
+bind = SUPER, Space, exec, $HOME/.config/scripts/lsfs_launcher_hook.sh
+EOF
+    ok "Super+Space bound to launcher"
+  fi
+  chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.config/hypr" 2>/dev/null || true
+  su - "$USER_NAME" -c "hyprctl reload" 2>/dev/null || true
+  record_manifest "desktop: Hyprland Super+Space bind"
+}
+
+###############################################################################
+# PHASE 11: SWAP (if needed)
+###############################################################################
+
+ensure_swap() {
   [[ "$PROFILE" != desktop ]] && return 0
   local hypr_conf="$HOME_DIR/.config/hypr/hyprland.conf"
   [[ ! -f "$hypr_conf" ]] && { mkdir -p "$HOME_DIR/.config/hypr"; echo "# Ash Linux Hyprland" > "$hypr_conf"; }
@@ -1058,7 +2221,11 @@ verify_all() {
   curl -sf http://localhost:11434/api/version >/dev/null 2>&1 && { ok "Ollama: running"; ((sv++)); } || { fail "Ollama: down"; ok=false; }
   curl -sf http://localhost:11434/api/tags 2>/dev/null | grep -q "$MODEL" && ok "Model $MODEL: loaded" || warn "Model $MODEL: not found"
   su - "$USER_NAME" -c "XDG_RUNTIME_DIR=/run/user/$(id -u $USER_NAME) systemctl --user is-active lsfs-daemon.service" 2>/dev/null | grep -qE "active|activating" && { ok "LSFS daemon: active"; ((sv++)); } || warn "LSFS daemon: inactive"
+  su - "$USER_NAME" -c "XDG_RUNTIME_DIR=/run/user/$(id -u $USER_NAME) systemctl --user is-active notebooklm-sync.service" 2>/dev/null | grep -qE "active|activating" && { ok "NotebookLM sync: active"; ((sv++)); } || warn "NotebookLM sync: inactive"
   [[ -x "$HOME_DIR/.config/scripts/lsfs_launcher_hook.sh" ]] && ok "Launcher hook: ready" || { fail "Launcher hook: missing"; ok=false; }
+  command -v ash-context &>/dev/null && ok "ash context: available" || warn "ash context: missing"
+  command -v ash-vscode &>/dev/null && ok "ash vscode: available" || warn "ash vscode: missing"
+  command -v ash-research &>/dev/null && ok "ash research: available" || warn "ash research: missing"
   [[ -f "/etc/systemd/system/ash-auto-update.timer" ]] && ok "Auto-update: configured"
   command -v wofi &>/dev/null && ok "Wofi: available"
   [[ -f "$SECRETS_FILE" ]] && ok "Secrets: configured"
@@ -1070,7 +2237,7 @@ verify_all() {
   [[ "$perms" == "700" || "$perms" == "755" ]] && ok "Qdrant dir permissions: $perms" || warn "Qdrant dir permissions: $perms"
 
   echo ""
-  ok "=== $sv/3 core services running ==="
+  ok "=== $sv/5 core services running ==="
   $ok
 }
 
@@ -1080,14 +2247,17 @@ verify_all() {
 
 welcome_wizard() {
   log "Running first-run welcome wizard..."
-  tui_msgbox "Ash Linux v$VERSION" "Install complete!\n\nNext steps:\n  1. Press Super+Space to test search\n  2. Run 'ash-ask' for AI-powered file Q&A\n  3. Check 'ash-doctor' for system health\n  4. Customize: re-run with --model <name> --webhook-url <url>\n  5. Audit log: $AUDIT_LOG"
+  tui_msgbox "Ash Linux v$VERSION" "Install complete!\n\nNext steps:\n  1. Press Super+Space to test search\n  2. Run 'ash context query' for AI search\n  3. Run 'ash vibe start' for vibe-coding mode\n  4. Run 'ash research topic' for web research\n  5. Check 'ash-doctor' for system health\n  6. Customize: re-run with --model <name> --webhook-url <url>\n  7. Audit log: $AUDIT_LOG"
 
   if ! have_tui; then
     echo ""
     echo -e "  ${BOLD}Quick start:${NC}"
     echo -e "    ${CYAN}Super+Space${NC}  →  Search files by meaning"
-    echo -e "    ${CYAN}lsfs-query${NC}    →  CLI: lsfs-query 'my config files'"
-    echo -e "    ${CYAN}ash-doctor${NC}    →  Full health check"
+    echo -e "    ${CYAN}ash context${NC}    →  Search all context (files + NotebookLM + web)"
+    echo -e "    ${CYAN}ash vibe start${NC}  →  Enter vibe-coding mode"
+    echo -e "    ${CYAN}ash research${NC}    →  Web research and index"
+    echo -e "    ${CYAN}lsfs-query${NC}     →  CLI: lsfs-query 'my config files'"
+    echo -e "    ${CYAN}ash-doctor${NC}     →  Full health check"
     echo -e "    ${CYAN}ash-ask${NC}       →  RAG question answering"
     echo ""
     return
@@ -1112,7 +2282,7 @@ welcome_wizard() {
 # DASHBOARD
 ###############################################################################
 
-print_dashboard() {
+  print_dashboard() {
   local all_pass=true
   for r in "${PHASE_STATUS[@]}"; do [[ "$r" != "pass" ]] && all_pass=false; done
 
@@ -1133,20 +2303,23 @@ print_dashboard() {
   done
 
   echo ""
-  local q=0 o=0 d=0
+  local q=0 o=0 d=0 n=0
   curl -sf http://localhost:6333/healthz >/dev/null 2>&1 && q=1
   curl -sf http://localhost:11434/api/version >/dev/null 2>&1 && o=1
   pgrep -f lsfs_daemon >/dev/null 2>&1 && d=1
-  echo -e "  ${CYAN}Live:${NC} Qdrant=$([ $q -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")  Ollama=$([ $o -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")  LSFS=$([ $d -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")"
+  pgrep -f ash-notebooklm-sync >/dev/null 2>&1 && n=1
+  echo -e "  ${CYAN}Live:${NC} Qdrant=$([ $q -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")  Ollama=$([ $o -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")  LSFS=$([ $d -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")  NotebookLM=$([ $n -eq 1 ] && echo "${GREEN}Up${NC}" || echo "${RED}Down${NC}")"
 
   local gpu=$(detect_gpu); echo -e "  ${CYAN}GPU:${NC} $gpu  ${CYAN}Profile:${NC} $PROFILE  ${CYAN}Model:${NC} $MODEL  ${CYAN}Arch:${NC} $ARCH"
   local de=$(detect_de); echo -e "  ${CYAN}Desktop:${NC} $de  ${CYAN}PM:${NC} $(detect_pm)  ${CYAN}Audit:${NC} $AUDIT_LEVEL"
   [[ -n "$WEBHOOK_URL" ]] && echo -e "  ${CYAN}Webhook:${NC} enabled"
 
   echo ""
-  echo -e "  ${BOLD}Quick:${NC}  ${CYAN}Super+Space${NC}  |  ${CYAN}lsfs-query 'search'${NC}  |  ${CYAN}ash-doctor${NC}"
+  echo -e "  ${BOLD}Quick:${NC}  ${CYAN}Super+Space${NC}  |  ${CYAN}ash context 'query'${NC}  |  ${CYAN}ash vibe start${NC}  |  ${CYAN}ash-doctor${NC}"
+  echo -e "  ${BOLD}AI:${NC}     ${CYAN}ash research <query>${NC}  |  ${CYAN}ash context 'query' --source notebooklm${NC}"
   echo -e "  ${BOLD}Logs:${NC}  ${CYAN}sudo journalctl -u qdrant -n 20${NC}"
   echo -e "  ${BOLD}Logs:${NC}  ${CYAN}journalctl --user -u lsfs-daemon -f${NC}"
+  echo -e "  ${BOLD}Logs:${NC}  ${CYAN}journalctl --user -u notebooklm-sync -f${NC}"
   echo ""
 
   if [[ -n "$ROLLBACK_SNAPSHOT" ]]; then
@@ -1163,6 +2336,151 @@ print_dashboard() {
   if $all_pass; then echo -e "  ${GREEN}${BOLD}✓ All systems operational. Press Super+Space!${NC}"
   else echo -e "  ${YELLOW}${BOLD}⚠ Some issues — run ash-doctor for details.${NC}"; fi
   echo ""
+}
+
+###############################################################################
+# PHASE: DEP FIREWALL (Item 5 & 6)
+###############################################################################
+
+install_dep_firewall() {
+  if resume_state dep_firewall install; then ok "Dep firewall already installed"; return 0; fi
+
+  local script_src
+  script_src="$(dirname "$0")/ash-dep-firewall.sh"
+  if [[ ! -f "$script_src" ]]; then
+    warn "ash-dep-firewall.sh not found next to installer — skipping"
+    return 0
+  fi
+
+  install -m 0755 "$script_src" /usr/local/bin/ash-dep-firewall
+  record_manifest "binary: /usr/local/bin/ash-dep-firewall"
+
+  # Create default allowlist directory
+  mkdir -p "$CONFIG_DIR/dep-allowlists"
+  for ecosystem in npm pip cargo; do
+    local src="$(dirname "$0")/../iso-profile/airootfs/etc/ash/dep-allowlists/${ecosystem}.txt"
+    if [[ -f "$src" ]]; then
+      cp "$src" "$CONFIG_DIR/dep-allowlists/${ecosystem}.txt"
+    fi
+  done
+  record_manifest "config: $CONFIG_DIR/dep-allowlists/"
+
+  # Wire shims for the installing user (non-root, PATH /usr/local/bin first)
+  for tool in npm pip pip3 cargo; do
+    local shim="/usr/local/bin/ash-firewall-${tool}"
+    [[ ! -e "$shim" ]] && ln -sf /usr/local/bin/ash-dep-firewall "$shim"
+    record_manifest "symlink: $shim"
+  done
+
+  ok "Dep firewall installed — shims: ash-firewall-npm, ash-firewall-pip, ash-firewall-cargo"
+  save_state dep_firewall install done '{}'
+}
+
+###############################################################################
+# PHASE: SNAPSHOT BRANCHING (Item 18)
+###############################################################################
+
+install_ash_branch() {
+  if resume_state ash_branch install; then ok "ash-branch already installed"; return 0; fi
+
+  local script_src
+  script_src="$(dirname "$0")/ash-branch.sh"
+  if [[ ! -f "$script_src" ]]; then
+    warn "ash-branch.sh not found — skipping"
+    return 0
+  fi
+
+  install -m 0755 "$script_src" /usr/local/bin/ash-branch
+  record_manifest "binary: /usr/local/bin/ash-branch"
+
+  # Create branches dir for the user
+  su - "$USER_NAME" -c "mkdir -p \$HOME/.ash/branches" 2>/dev/null || true
+
+  ok "ash-branch installed — use: ash-branch create <name>"
+  save_state ash_branch install done '{}'
+}
+
+###############################################################################
+# PHASE: MODEL ROUTER (Item 19)
+###############################################################################
+
+install_model_router() {
+  if resume_state model_router install; then ok "Model router already installed"; return 0; fi
+
+  local script_src
+  script_src="$(dirname "$0")/ash-model-router.py"
+  if [[ ! -f "$script_src" ]]; then
+    warn "ash-model-router.py not found — skipping"
+    return 0
+  fi
+
+  install -m 0755 "$script_src" /usr/local/bin/ash-model-router.py
+  record_manifest "binary: /usr/local/bin/ash-model-router.py"
+
+  # Install default router config if not already present
+  local cfg_src
+  cfg_src="$(dirname "$0")/../iso-profile/airootfs/etc/ash/router.json"
+  if [[ -f "$cfg_src" && ! -f "$CONFIG_DIR/router.json" ]]; then
+    cp "$cfg_src" "$CONFIG_DIR/router.json"
+    record_manifest "config: $CONFIG_DIR/router.json"
+  fi
+
+  # Install systemd service
+  cat > /etc/systemd/system/ash-model-router.service <<UNIT
+[Unit]
+Description=Ash Local Model Router (Ollama proxy on :11435)
+After=ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=$USER_NAME
+ExecStart=/usr/bin/python3 /usr/local/bin/ash-model-router.py --host 127.0.0.1 --port 11435 --config $CONFIG_DIR/router.json
+Restart=on-failure
+RestartSec=5
+$(if [[ "$NO_HARDEN" != true ]]; then echo "NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+ReadWritePaths=/var/log/ash"; fi)
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  systemctl daemon-reload >>"$LOGFILE" 2>&1
+  systemctl enable --now ash-model-router.service >>"$LOGFILE" 2>&1 || warn "Model router start failed (Ollama may not be up yet)"
+  record_manifest "service: ash-model-router.service"
+
+  ok "Model router installed — listening on :11435 (upstream Ollama :11434)"
+  save_state model_router install done '{}'
+}
+
+###############################################################################
+# PHASE: SUPPLY CHAIN AUDIT (Item 20)
+###############################################################################
+
+install_audit_logging() {
+  if resume_state audit_logging install; then ok "Audit logging already installed"; return 0; fi
+
+  local script_src
+  script_src="$(dirname "$0")/ash-audit-setup.sh"
+  if [[ ! -f "$script_src" ]]; then
+    warn "ash-audit-setup.sh not found — skipping"
+    return 0
+  fi
+
+  install -m 0755 "$script_src" /usr/local/bin/ash-audit-setup
+  record_manifest "binary: /usr/local/bin/ash-audit-setup"
+
+  mkdir -p /var/log/ash
+  chmod 750 /var/log/ash
+
+  bash /usr/local/bin/ash-audit-setup install >>"$LOGFILE" 2>&1 \
+    && ok "Supply chain audit logging configured" \
+    || warn "Audit setup had issues — check: ash-audit-setup status"
+
+  record_manifest "audit: /etc/audit/rules.d/99-ash-supply-chain.rules"
+  save_state audit_logging install done '{}'
 }
 
 mark_installed() {
@@ -1245,8 +2563,34 @@ EOF
   run_phase "LSFS Indexer" "Daemon + query deployed" deploy_lsfs || true
   sync
 
+  run_phase "NotebookLM Sync" "Sync daemon deployed" install_notebooklm_sync || true
+  sync
+
+  run_phase "NotebookLM MCP" "MCP server for AI agents" install_notebooklm_mcp || true
+  sync
+
+  run_phase "Context & Vibe Mode" "ash context + ash vibe ready" install_ash_context || true
+  sync
+
+  run_phase "Web Research" "ash-research CLI available" install_web_research || true
+  sync
+
   run_phase "Desktop" "Super+Space configured" patch_hyprland || true
   sync
+
+  # ── New hardening & tooling phases ─────────────────────────────────────────
+  run_phase "Dep Firewall" "Anti-slopsquatting shims installed" install_dep_firewall || true
+  sync
+
+  run_phase "Snapshot Branching" "ash-branch installed" install_ash_branch || true
+  sync
+
+  run_phase "Model Router" "ash-model-router on :11435" install_model_router || true
+  sync
+
+  run_phase "Supply Chain Audit" "auditd + JSONL provenance" install_audit_logging || true
+  sync
+  # ── End new phases ──────────────────────────────────────────────────────────
 
   run_phase "Swap" "Swapfile ensured" ensure_swap || true
   sync

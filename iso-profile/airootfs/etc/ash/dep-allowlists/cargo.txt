@@ -1,0 +1,39 @@
+# cargo allowlist — crates permitted for agent-driven installs
+
+# Async runtime
+tokio
+async-std
+
+# Serialization
+serde
+serde_json
+toml
+bincode
+
+# CLI
+clap
+structopt
+dialoguer
+
+# Error handling
+anyhow
+thiserror
+color-eyre
+
+# Networking
+reqwest
+hyper
+axum
+warp
+actix-web
+
+# Utilities
+rand
+chrono
+uuid
+regex
+itertools
+rayon
+tracing
+env_logger
+log

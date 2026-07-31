@@ -42,10 +42,20 @@ SIGN_DIR="${ISO_DIR}"
 [[ -f "provenance.intoto.jsonl" ]] || warn "SLSA provenance not found"
 
 PASSED=0
-TOTAL=0
+TOTAL=6  # fixed total — update if adding/removing checks
+
+# ── Load minisign public key ─────────────────────────────────────────────────
+# Priority: ASH_MINISIGN_PUBKEY env var → /etc/ash/minisign.pub → fail clearly
+MINISIGN_PUBKEY=""
+if [[ -n "${ASH_MINISIGN_PUBKEY:-}" ]]; then
+    MINISIGN_PUBKEY="$ASH_MINISIGN_PUBKEY"
+elif [[ -f /etc/ash/minisign.pub ]]; then
+    MINISIGN_PUBKEY=$(cat /etc/ash/minisign.pub)
+elif [[ -f "${ISO_DIR}/ash.pub" ]]; then
+    MINISIGN_PUBKEY=$(cat "${ISO_DIR}/ash.pub")
+fi
 
 # 1. SHA256
-TOTAL=$((TOTAL + 1))
 log "[1/${TOTAL}] Verifying SHA256..."
 if [[ -f "ash-${VERSION}.sha256" ]]; then
     sha256sum -c "ash-${VERSION}.sha256" >/dev/null && \
@@ -58,21 +68,23 @@ else
 fi
 
 # 2. minisign
-TOTAL=$((TOTAL + 1))
-log "[${TOTAL}/${TOTAL}] Verifying minisign (Ed25519)..."
+log "[2/${TOTAL}] Verifying minisign (Ed25519)..."
 if [[ -f "ash-${VERSION}.minisig" ]]; then
-    # Official minisign public key
-    MINISIGN_PUBKEY="RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y="
-    minisign -Vm "$ISO" -P "$MINISIGN_PUBKEY" -x "ash-${VERSION}.minisig" >/dev/null 2>&1 && \
-        { pass "minisign OK"; PASSED=$((PASSED + 1)); } || \
-        fail "minisign INVALID — DO NOT BOOT"
+    if [[ -z "$MINISIGN_PUBKEY" ]]; then
+        warn "No minisign public key found."
+        warn "Set ASH_MINISIGN_PUBKEY env var, place key in /etc/ash/minisign.pub, or ${ISO_DIR}/ash.pub"
+        warn "Skipping minisign verification"
+    else
+        minisign -Vm "$ISO" -P "$MINISIGN_PUBKEY" -x "ash-${VERSION}.minisig" >/dev/null 2>&1 && \
+            { pass "minisign OK"; PASSED=$((PASSED + 1)); } || \
+            fail "minisign INVALID — DO NOT BOOT"
+    fi
 else
     warn "minisig file missing — skipping"
 fi
 
 # 3. cosign (bundle)
-TOTAL=$((TOTAL + 1))
-log "[${TOTAL}/${TOTAL}] Verifying cosign (keyless + Sigstore, bundle)..."
+log "[3/${TOTAL}] Verifying cosign (keyless + Sigstore, bundle)..."
 if [[ -f "ash-${VERSION}.cosign.bundle" ]]; then
     cosign verify-blob \
         --bundle "ash-${VERSION}.cosign.bundle" \
@@ -86,8 +98,7 @@ else
 fi
 
 # 4. cosign (detached)
-TOTAL=$((TOTAL + 1))
-log "[${TOTAL}/${TOTAL}] Verifying cosign (detached signature)..."
+log "[4/${TOTAL}] Verifying cosign (detached signature)..."
 if [[ -f "ash-${VERSION}.cosign.sig" && -f "ash-${VERSION}.cosign.cert" ]]; then
     cosign verify-blob \
         --signature "ash-${VERSION}.cosign.sig" \
@@ -102,8 +113,7 @@ else
 fi
 
 # 5. SLSA Provenance
-TOTAL=$((TOTAL + 1))
-log "[${TOTAL}/${TOTAL}] Verifying SLSA Level 3 Provenance..."
+log "[5/${TOTAL}] Verifying SLSA Level 3 Provenance..."
 if [[ -f "provenance.intoto.jsonl" ]]; then
     slsa-verifier verify-artifact \
         "$ISO" \
@@ -118,8 +128,7 @@ else
 fi
 
 # 6. GitHub Attestation
-TOTAL=$((TOTAL + 1))
-log "[${TOTAL}/${TOTAL}] Verifying GitHub Attestation..."
+log "[6/${TOTAL}] Verifying GitHub Attestation..."
 if command -v gh &>/dev/null; then
     gh attest verify "$ISO" --repo ash-linux/ash >/dev/null 2>&1 && \
         { pass "GitHub Attestation OK"; PASSED=$((PASSED + 1)); } || \

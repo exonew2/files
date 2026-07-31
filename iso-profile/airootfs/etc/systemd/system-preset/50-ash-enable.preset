@@ -1,0 +1,6 @@
+# 50-ash-enable.preset — Enable Ash hardening and AI services by default
+
+enable ash-agent-isolation.service
+enable ash-agents.slice
+enable ash-model-router.service
+enable ash-audit-firstboot.service

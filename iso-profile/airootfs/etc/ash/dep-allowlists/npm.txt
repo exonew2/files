@@ -1,0 +1,33 @@
+# npm allowlist — packages permitted for agent-driven installs
+# One package name per line, no version specifiers
+# Edit this file to grant access to additional packages
+
+# Core build tooling
+typescript
+ts-node
+esbuild
+vite
+webpack
+
+# Utilities
+lodash
+axios
+dotenv
+chalk
+commander
+
+# Testing
+jest
+vitest
+mocha
+
+# Formatting
+prettier
+eslint
+
+# Frameworks (common)
+react
+react-dom
+next
+express
+fastify

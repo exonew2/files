@@ -197,3 +197,13 @@ python-fusepy
 
 # === AUR Helper ===
 paru
+
+# === Clipboard & Portal (Items 16, 17) ===
+wl-clip-persist
+xdg-desktop-portal-hyprland
+
+# === AST chunking (Item 9) ===
+python-tree-sitter
+
+# === Supply chain audit (Item 20) ===
+audit

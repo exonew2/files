@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""
+ash-notebooklm-sync — NotebookLM → Qdrant knowledge distillation daemon.
+
+Architecture:
+  npx notebooklm-mcp-server (stdio MCP) ──► this daemon ──► Qdrant (notebooklm_context collection)
+  ash-project MCP server (running PID)  ──► this daemon ──► Qdrant (apps collection, importance boost)
+
+The daemon:
+  1. Talks to notebooklm-mcp-server over stdio JSON-RPC 2.0
+  2. Lists all notebooks, fetches their sources
+  3. Chunks sources using AST-aware chunker if available, else plain
+  4. Embeds each chunk via Ollama nomic-embed-text
+  5. Upserts into Qdrant with importance scores from ASH architecture decisions
+  6. Also syncs local project context from ash-project MCP if available
+  7. Writes distilled "skills" as local markdown files for offline use
+"""
+
+import hashlib
+import json
+import logging
+import os
+import subprocess
+import sys
+import time
+import threading
+from pathlib import Path
+from typing import Any
+
+# Optional: use AST chunker if installed
+try:
+    sys.path.insert(0, str(Path.home() / ".config/scripts"))
+    from lsfs_chunker import chunk_file
+    HAS_CHUNKER = True
+except ImportError:
+    HAS_CHUNKER = False
+
+try:
+    import urllib.request
+    import urllib.error
+    HAS_URLLIB = True
+except ImportError:
+    HAS_URLLIB = False
+
+# ── Config ────────────────────────────────────────────────────────────────────
+HOME             = Path(os.environ.get("HOME", "/home/aiuser"))
+QDRANT_URL       = os.environ.get("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY   = os.environ.get("QDRANT_API_KEY", "")
+OLLAMA_URL       = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/embeddings")
+EMBED_MODEL      = os.environ.get("ASH_MODEL", "nomic-embed-text")
+COLLECTION_NB    = "notebooklm_context"   # Notebook content vectors
+COLLECTION_APPS  = "apps"                 # Main LSFS collection
+POLL_INTERVAL    = int(os.environ.get("NOTEBOOKLM_POLL", "300"))  # 5 min
+SKILL_DIR        = Path(os.environ.get("NOTEBOOKLM_SKILL_DIR", HOME / ".ash/notebooklm/skills"))
+ASH_PROJECT_MCP  = os.environ.get("ASH_PROJECT_MCP_SCRIPT",
+                                   str(HOME / "ash-iso/.opencode/mcp-server/server.py"))
+# Notebook IDs to sync — comma-separated, from configure-agents.sh
+NOTEBOOK_IDS     = [n.strip() for n in
+                    os.environ.get("NOTEBOOKLM_NOTEBOOKS",
+                                   "18deba09-f237-4348-9ad8-68f4f6f859f7").split(",")
+                    if n.strip()]
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [notebooklm-sync] %(levelname)s %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("sync")
+
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
+
+def _http(method: str, url: str, body: Any = None, timeout: int = 10) -> Any:
+    import urllib.request, urllib.error, json as _json
+    data = _json.dumps(body).encode() if body is not None else None
+    headers = {"Content-Type": "application/json"}
+    if QDRANT_API_KEY:
+        headers["api-key"] = QDRANT_API_KEY
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return _json.loads(r.read())
+    except Exception as exc:
+        log.debug("HTTP %s %s → %s", method, url, exc)
+        return {}
+
+# ── Qdrant helpers ────────────────────────────────────────────────────────────
+
+def ensure_collection(name: str, dim: int = 768) -> None:
+    r = _http("GET", f"{QDRANT_URL}/collections/{name}")
+    if r.get("result"):
+        return
+    body = {"vectors": {"size": dim, "distance": "Cosine"}}
+    result = _http("PUT", f"{QDRANT_URL}/collections/{name}", body, timeout=15)
+    if result.get("result"):
+        log.info("Created Qdrant collection: %s", name)
+    else:
+        log.warning("Could not create collection %s: %s", name, result)
+
+def upsert_point(collection: str, point_id: str, vector: list, payload: dict) -> bool:
+    r = _http("PUT", f"{QDRANT_URL}/collections/{collection}/points",
+              {"points": [{"id": point_id, "vector": vector, "payload": payload}]},
+              timeout=10)
+    return bool(r.get("result"))
+
+# ── Embedding ─────────────────────────────────────────────────────────────────
+
+_embed_cache: dict[str, list] = {}
+
+def embed(text: str) -> list | None:
+    if not text or not text.strip():
+        return None
+    key = hashlib.md5(text[:512].encode()).hexdigest()
+    if key in _embed_cache:
+        return _embed_cache[key]
+    body = {"model": EMBED_MODEL, "prompt": text[:2048], "keep_alive": -1}
+    for attempt in range(3):
+        r = _http("POST", OLLAMA_URL, body, timeout=30)
+        vec = r.get("embedding")
+        if vec:
+            _embed_cache[key] = vec
+            return vec
+        time.sleep(1 + attempt)
+    return None
+
+# ── MCP stdio client ──────────────────────────────────────────────────────────
+
+class MCPClient:
+    """Minimal JSON-RPC 2.0 stdio MCP client."""
+
+    def __init__(self, cmd: list[str], env: dict | None = None):
+        self.cmd = cmd
+        self.env = env or os.environ.copy()
+        self._proc: subprocess.Popen | None = None
+        self._id = 0
+
+    def __enter__(self):
+        self._proc = subprocess.Popen(
+            self.cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=self.env,
+            text=True,
+            bufsize=1,
+        )
+        # Initialize
+        self._send("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "ash-notebooklm-sync", "version": "2.0"},
+        })
+        self._recv()  # discard initialize response
+        self._send("notifications/initialized", {})
+        return self
+
+    def __exit__(self, *_):
+        if self._proc:
+            try:
+                self._proc.stdin.close()
+                self._proc.wait(timeout=5)
+            except Exception:
+                self._proc.kill()
+
+    def _send(self, method: str, params: dict) -> int:
+        self._id += 1
+        msg = json.dumps({"jsonrpc": "2.0", "id": self._id, "method": method, "params": params})
+        self._proc.stdin.write(msg + "\n")
+        self._proc.stdin.flush()
+        return self._id
+
+    def _recv(self) -> dict:
+        for _ in range(100):  # up to 100 lines (skip notifications)
+            line = self._proc.stdout.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+                if "result" in msg or "error" in msg:
+                    return msg
+            except json.JSONDecodeError:
+                continue
+        return {}
+
+    def call(self, method: str, params: dict | None = None) -> Any:
+        self._send(method, params or {})
+        resp = self._recv()
+        if resp.get("error"):
+            log.warning("MCP error: %s", resp["error"])
+            return None
+        return resp.get("result")
+
+# ── Plain text chunking fallback ──────────────────────────────────────────────
+
+def plain_chunks(text: str, size: int = 800, overlap: int = 50) -> list[str]:
+    words = text.split()
+    chunks, i = [], 0
+    while i < len(words):
+        chunk = " ".join(words[i:i+size])
+        if chunk.strip():
+            chunks.append(chunk)
+        i += size - overlap
+    return chunks
+
+# ── Skill file distillation ───────────────────────────────────────────────────
+
+def save_skill(nb_title: str, source_name: str, content: str) -> None:
+    """Save notebook source as a local markdown skill file for offline use."""
+    SKILL_DIR.mkdir(parents=True, exist_ok=True)
+    slug = "".join(c if c.isalnum() else "_" for c in f"{nb_title}_{source_name}")[:60]
+    path = SKILL_DIR / f"{slug}.md"
+    if path.exists() and len(path.read_text()) == len(content):
+        return  # unchanged
+    with open(path, "w") as f:
+        f.write(f"# {source_name}\n\n_Source: {nb_title} (NotebookLM)_\n\n---\n\n{content}")
+    log.debug("Skill saved: %s", path)
+
+# ── Core sync: NotebookLM → Qdrant ───────────────────────────────────────────
+
+def sync_via_npx_mcp() -> int:
+    """
+    Pull notebook content from npx notebooklm-mcp-server via stdio MCP,
+    embed chunks, upsert into Qdrant, and write skill files.
+    Returns number of chunks indexed.
+    """
+    ensure_collection(COLLECTION_NB)
+
+    cmd = ["npx", "--yes", "notebooklm-mcp-server", "server"]
+    total = 0
+
+    try:
+        with MCPClient(cmd) as mcp:
+            # List available tools to confirm connection
+            tools_resp = mcp.call("tools/list")
+            if tools_resp is None:
+                log.warning("notebooklm-mcp-server did not respond to tools/list")
+                return 0
+
+            tool_names = {t["name"] for t in tools_resp.get("tools", [])}
+            log.info("notebooklm-mcp-server tools: %s", tool_names)
+
+            # For each known notebook ID, fetch sources
+            for nb_id in NOTEBOOK_IDS:
+                log.info("Syncing notebook: %s", nb_id)
+
+                # Try get_notebook tool if available
+                if "get_notebook" in tool_names:
+                    result = mcp.call("tools/call", {
+                        "name": "get_notebook",
+                        "arguments": {"notebook_id": nb_id}
+                    })
+                    nb_content = None
+                    if result and result.get("content"):
+                        try:
+                            text = result["content"][0].get("text", "")
+                            nb_content = json.loads(text) if text.startswith("{") else {"sources": [{"content": text, "title": "content"}]}
+                        except (json.JSONDecodeError, IndexError, KeyError):
+                            pass
+
+                    if nb_content:
+                        nb_title = nb_content.get("title", nb_id)
+                        sources  = nb_content.get("sources", [])
+                        for source in sources:
+                            src_text  = source.get("content", "") or source.get("text", "")
+                            src_title = source.get("title", "untitled")
+                            if not src_text.strip():
+                                continue
+
+                            save_skill(nb_title, src_title, src_text)
+
+                            # Chunk the source
+                            chunks = plain_chunks(src_text)
+                            for ci, chunk in enumerate(chunks):
+                                vec = embed(chunk)
+                                if not vec:
+                                    continue
+                                point_id = hashlib.md5(
+                                    f"{nb_id}:{src_title}:{ci}".encode()
+                                ).hexdigest()
+                                payload = {
+                                    "source": "notebooklm",
+                                    "notebook_id": nb_id,
+                                    "notebook_title": nb_title,
+                                    "source_name": src_title,
+                                    "chunk_index": ci,
+                                    "text": chunk[:400],
+                                    "type": "notebooklm",
+                                    # Item 11: high importance for notebook content
+                                    "importance": 1.6,
+                                }
+                                if upsert_point(COLLECTION_NB, point_id, vec, payload):
+                                    total += 1
+
+                elif "search_notebooks" in tool_names:
+                    # Fallback: no get_notebook, use search to get samples
+                    log.info("get_notebook not available — using search_notebooks as fallback")
+                    for query in ["architecture", "configuration", "installation", "agent", "security"]:
+                        result = mcp.call("tools/call", {
+                            "name": "search_notebooks",
+                            "arguments": {"query": query}
+                        })
+                        if result and result.get("content"):
+                            text = result["content"][0].get("text", "")
+                            if text and text.strip():
+                                vec = embed(text[:2048])
+                                if vec:
+                                    point_id = hashlib.md5(
+                                        f"search:{nb_id}:{query}".encode()
+                                    ).hexdigest()
+                                    if upsert_point(COLLECTION_NB, point_id, vec, {
+                                        "source": "notebooklm",
+                                        "notebook_id": nb_id,
+                                        "query": query,
+                                        "text": text[:400],
+                                        "type": "notebooklm_search",
+                                        "importance": 1.4,
+                                    }):
+                                        total += 1
+
+    except FileNotFoundError:
+        log.warning("npx not found — cannot run notebooklm-mcp-server")
+    except Exception as exc:
+        log.error("NotebookLM MCP sync error: %s", exc, exc_info=True)
+
+    log.info("NotebookLM sync complete: %d chunks indexed to %s", total, COLLECTION_NB)
+    return total
+
+# ── Local project context sync (ash-project MCP) ─────────────────────────────
+
+def sync_ash_project_context() -> int:
+    """
+    Pull indexed project files from the running ash-project MCP server,
+    embed architecture-relevant content, upsert into apps collection with
+    high importance scores (Item 11).
+    """
+    if not Path(ASH_PROJECT_MCP).exists():
+        log.debug("ash-project MCP script not found at %s — skipping", ASH_PROJECT_MCP)
+        return 0
+
+    ensure_collection(COLLECTION_APPS)
+    total = 0
+
+    cmd = ["python3", ASH_PROJECT_MCP]
+    env = os.environ.copy()
+    env["ASH_PROJECT_ROOT"] = str(HOME / "ash-iso")
+    env["NOTEBOOKLM_NOTEBOOKS"] = ",".join(NOTEBOOK_IDS)
+    env["NOTEBOOKLM_CACHE_DIR"] = str(HOME / ".ash/notebooklm/cache")
+
+    try:
+        with MCPClient(cmd, env) as mcp:
+            tools_resp = mcp.call("tools/list")
+            if not tools_resp:
+                return 0
+            tool_names = {t["name"] for t in tools_resp.get("tools", [])}
+
+            # Fetch project context overview
+            if "get_context" in tool_names:
+                result = mcp.call("tools/call", {
+                    "name": "get_context",
+                    "arguments": {}
+                })
+                if result and result.get("content"):
+                    text = result["content"][0].get("text", "")
+                    if text:
+                        vec = embed(text[:4096])
+                        if vec:
+                            pid = hashlib.md5(b"ash-project:context-overview").hexdigest()
+                            if upsert_point(COLLECTION_APPS, pid, vec, {
+                                "source": "ash-project-mcp",
+                                "name": "project-overview",
+                                "path": "ash-iso/project-context",
+                                "type": "project_context",
+                                "importance": 1.8,  # highest importance
+                            }):
+                                total += 1
+                                log.info("Indexed project context overview")
+
+            # Search for architecture decisions and key files
+            if "search_project" in tool_names:
+                for topic in [
+                    "architecture decisions",
+                    "security hardening",
+                    "NotebookLM integration",
+                    "Qdrant Ollama LSFS",
+                    "systemd services",
+                    "btrfs snapshots",
+                    "ISO build pipeline",
+                ]:
+                    result = mcp.call("tools/call", {
+                        "name": "search_project",
+                        "arguments": {"query": topic, "limit": 3}
+                    })
+                    if result and result.get("content"):
+                        text = result["content"][0].get("text", "")
+                        if text:
+                            vec = embed(text[:2048])
+                            if vec:
+                                pid = hashlib.md5(f"ash-project:search:{topic}".encode()).hexdigest()
+                                if upsert_point(COLLECTION_APPS, pid, vec, {
+                                    "source": "ash-project-mcp",
+                                    "name": topic,
+                                    "path": f"ash-iso/search/{topic}",
+                                    "type": "project_search",
+                                    "importance": 1.5,
+                                }):
+                                    total += 1
+
+    except Exception as exc:
+        log.error("ash-project MCP sync error: %s", exc, exc_info=True)
+
+    log.info("ash-project MCP sync: %d chunks indexed", total)
+    return total
+
+# ── Cross-collection notebook skill injection ─────────────────────────────────
+
+def inject_skills_to_apps_collection() -> int:
+    """
+    Read distilled skill markdown files and inject them into the main
+    apps collection with very high importance (Item 11 persistent memory).
+    """
+    if not SKILL_DIR.exists():
+        return 0
+    ensure_collection(COLLECTION_APPS)
+    total = 0
+    for skill_file in SKILL_DIR.glob("*.md"):
+        try:
+            content = skill_file.read_text(errors="replace")[:4096]
+            if not content.strip():
+                continue
+            chunks = plain_chunks(content, size=400, overlap=30)
+            for ci, chunk in enumerate(chunks):
+                vec = embed(chunk)
+                if not vec:
+                    continue
+                point_id = hashlib.md5(f"skill:{skill_file.name}:{ci}".encode()).hexdigest()
+                if upsert_point(COLLECTION_APPS, point_id, vec, {
+                    "source": "notebooklm-skill",
+                    "name": skill_file.stem,
+                    "path": str(skill_file),
+                    "type": "distilled_skill",
+                    "importance": 1.7,  # skills are high-importance persistent memory
+                }):
+                    total += 1
+        except Exception as exc:
+            log.debug("Skill injection error %s: %s", skill_file, exc)
+    if total:
+        log.info("Injected %d skill chunks into apps collection", total)
+    return total
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
+
+def run_once() -> None:
+    log.info("Starting sync cycle...")
+    t0 = time.time()
+
+    nb_count  = sync_via_npx_mcp()
+    prj_count = sync_ash_project_context()
+    skl_count = inject_skills_to_apps_collection()
+
+    elapsed = time.time() - t0
+    log.info(
+        "Sync complete in %.1fs: %d notebook chunks, %d project chunks, %d skill chunks",
+        elapsed, nb_count, prj_count, skl_count,
+    )
+
+def main() -> None:
+    if "--once" in sys.argv:
+        run_once()
+        return
+
+    log.info("NotebookLM sync daemon starting (poll every %ds)", POLL_INTERVAL)
+    log.info("Notebooks: %s", NOTEBOOK_IDS)
+    log.info("Skill dir: %s", SKILL_DIR)
+
+    while True:
+        try:
+            run_once()
+        except KeyboardInterrupt:
+            log.info("Interrupted — stopping")
+            break
+        except Exception as exc:
+            log.error("Sync cycle error: %s", exc, exc_info=True)
+        time.sleep(POLL_INTERVAL)
+
+if __name__ == "__main__":
+    main()

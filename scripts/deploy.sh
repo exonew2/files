@@ -140,22 +140,28 @@ if [ "$HAS_RESULTS" -eq 0 ]; then
                 TIME_ARG="${NUM}d"
             fi
         fi
-        if command -v fd &>/dev/null; then
-            fd --changed-within "$TIME_ARG" --type f "$HOME" 2>/dev/null | head -20 > "$RESULTS_FILE" || true
-        elif command -v find &>/dev/null; then
+        if command -v fd >/dev/null; then
+            # Item 15: use --max-results to avoid SIGPIPE from fd | head
+            fd --changed-within "$TIME_ARG" --type f --max-results 20 "$HOME" \
+                > "$RESULTS_FILE" 2>/dev/null || true
+        elif command -v find >/dev/null; then
             if echo "$TIME_ARG" | grep -q 'h$'; then
                 MINS=$(( ${TIME_ARG%h} * 60 ))
             else
                 MINS=$(( ${TIME_ARG%d} * 1440 ))
             fi
-            find "$HOME" -mmin "-${MINS}" -type f 2>/dev/null | head -20 > "$RESULTS_FILE" || true
+            # Item 15: use awk NR limit instead of head to avoid SIGPIPE
+            find "$HOME" -mmin "-${MINS}" -type f 2>/dev/null \
+                | awk 'NR<=20{print}NR==20{exit}' > "$RESULTS_FILE" || true
         fi
         [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
     fi
 fi
 
-if [ "$HAS_RESULTS" -eq 0 ] && command -v fd &>/dev/null; then
-    fd --type f --max-depth 5 "$HOME" 2>/dev/null | head -15 > "$RESULTS_FILE" || true
+if [ "$HAS_RESULTS" -eq 0 ] && command -v fd >/dev/null; then
+    # Item 15: --max-results avoids SIGPIPE that occurs with fd | head
+    fd --type f --max-depth 5 --max-results 15 "$HOME" \
+        > "$RESULTS_FILE" 2>/dev/null || true
     [ -s "$RESULTS_FILE" ] && HAS_RESULTS=1
 fi
 

@@ -1,0 +1,248 @@
+#!/bin/bash
+# ash vibe — most vibe-coding friendly terminal mode
+# Auto-snapshot, auto-index, contextual AI, NotebookLM awareness
+set -euo pipefail
+
+HOME_DIR="${HOME:-/home/shrey}"
+ASH_DIR="$HOME_DIR/.ash"
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+NOTEBOOKLM_API="${NOTEBOOKLM_API:-http://localhost:3000}"
+SYNC_DIR="$ASH_DIR/notebooklm"
+VIBE_LOG="$ASH_DIR/vibe.log"
+SNAPSHOT_DIR="$ASH_DIR/snapshots"
+CONTEXT_FILE="$ASH_DIR/vibe_context.json"
+
+mkdir -p "$ASH_DIR" "$SNAPSHOT_DIR" "$SYNC_DIR"
+
+log() { echo "[$(date '+%H:%M:%S')] $*" >> "$VIBE_LOG"; echo "$*"; }
+
+cmd="${1:-}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  start)
+    log "🚀 Starting vibe mode..."
+    pre_start
+    log "⚡ Vibe mode active — all context available"
+    log "   Type 'exit' to leave vibe mode"
+    log "   Shortcuts: ctrl+d=snapshot, ctrl+l=search, ctrl+n=notebooklm, ctrl+w=web search"
+    $SHELL --rcfile <(cat "$HOME_DIR/.bashrc" 2>/dev/null; cat "$HOME_DIR/.zshrc" 2>/dev/null; echo 'PS1="(vibe) \w \$ "')
+    post_stop
+    ;;
+  snapshot)
+    take_snapshot
+    log "📸 Snapshot saved"
+    ;;
+  search)
+    QUERY="${1:-}"
+    if [[ -z "$QUERY" ]]; then
+      read -rp "🔍 Search all context: " QUERY
+    fi
+    ash_context_search "$QUERY"
+    ;;
+  notebooklm)
+    QUERY="${1:-}"
+    if [[ -z "$QUERY" ]]; then
+      read -rp "📓 NotebookLM query: " QUERY
+    fi
+    ash_notebooklm_search "$QUERY"
+    ;;
+  web)
+    QUERY="${1:-}"
+    if [[ -z "$QUERY" ]]; then
+      read -rp "🌐 Web search: " QUERY
+    fi
+    ash_web_search "$QUERY"
+    ;;
+  status)
+    show_status
+    ;;
+  sync)
+    log "🔄 Syncing NotebookLM notebooks..."
+    sync_notebooklm
+    log "✅ Sync complete"
+    ;;
+  config)
+    show_config
+    ;;
+  --help|help|*)
+    cat <<'HELP'
+ash vibe — the most vibe-coding friendly terminal mode
+
+Commands:
+  ash vibe start        Enter vibe mode with all context loaded
+  ash vibe snapshot     Auto-save current workspace state
+  ash vibe search       Search across file + NotebookLM + web context
+  ash vibe notebooklm   Search NotebookLM knowledge base only
+  ash vibe web          Search the web and index results
+  ash vibe status       Show vibe mode status and context sources
+  ash vibe sync         Force sync all NotebookLM notebooks to Qdrant
+  ash vibe config       Show vibe mode configuration
+
+Keyboard shortcuts in vibe mode:
+  Ctrl+D    Take a workspace snapshot
+  Ctrl+L    Search all context
+  Ctrl+N    Query NotebookLM
+  Ctrl+W    Web search
+
+Vibe mode features:
+  • Auto-snapshot on entry (files + NotebookLM state)
+  • NotebookLM context injected into terminal preprompt
+  • Web search results indexed for follow-up queries
+  • Qdrant-backed semantic search across all sources
+  • Disposable — state isolated per session
+HELP
+    ;;
+esac
+
+pre_start() {
+  log "Taking pre-start snapshot..."
+  take_snapshot
+  log "Syncing NotebookLM notebooks..."
+  sync_notebooklm
+  log "Ensuring Qdrant collections exist..."
+  ensure_collections
+  log "Building context index..."
+  build_index
+}
+
+post_stop() {
+  log "Taking post-stop snapshot..."
+  take_snapshot
+  log "Vibe mode ended"
+}
+
+take_snapshot() {
+  local ts
+  ts=$(date +%Y%m%d_%H%M%S)
+  local snap_dir="$SNAPSHOT_DIR/vibe_$ts"
+  mkdir -p "$snap_dir"
+  find "$HOME_DIR" -maxdepth 3 -type f \( -name "*.py" -o -name "*.sh" -o -name "*.md" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.txt" -o -name "*.cfg" \) 2>/dev/null | head -500 | while read -r f; do
+    cp --parents "$f" "$snap_dir/" 2>/dev/null || true
+  done
+  echo '{"ts":"'"$ts"'","home":"'"$HOME_DIR"'","files":500}' > "$snap_dir/manifest.json"
+  echo "$snap_dir"
+}
+
+sync_notebooklm() {
+  if command -v python3 &>/dev/null; then
+    python3 "$HOME_DIR/ai-services/tools/notebooklm-sync/src/sync.py" 2>/dev/null || \
+      python3 "$HOME_DIR/ai-services/tools/notebooklm-sync/src/sync.py" 2>/dev/null || true
+  fi
+}
+
+ensure_collections() {
+  for col in apps notebooklm_context web_context; do
+    curl -sf -X PUT "$QDRANT_URL/collections/$col" \
+      -H "Content-Type: application/json" \
+      -d '{"vectors":{"size":768,"distance":"Cosine"}}' >/dev/null 2>&1 || true
+  done
+}
+
+build_index() {
+  if [[ -f ".cursorrules" ]]; then
+    log "Indexing .cursorrules..."
+    embed_and_index ".cursorrules" "file" "cursor rules"
+  fi
+  if [[ -f ".windsurfrules" ]]; then
+    log "Indexing .windsurfrules..."
+    embed_and_index ".windsurfrules" "file" "windsurf rules"
+  fi
+  if [[ -f "README.md" ]]; then
+    log "Indexing README.md..."
+    embed_and_index "README.md" "file" "readme"
+  fi
+  if [[ -f "FUTURE.md" ]]; then
+    log "Indexing FUTURE.md..."
+    embed_and_index "FUTURE.md" "file" "future roadmap"
+  fi
+  find "$HOME_DIR" -maxdepth 2 -name "*.md" -type f 2>/dev/null | while read -r f; do
+    embed_and_index "$f" "file" "$(basename "$f")"
+  done
+}
+
+embed_and_index() {
+  local file="$1"
+  local source="$2"
+  local name="$3"
+  if [[ ! -f "$file" ]]; then return; fi
+  local content
+  content=$(head -c 5000 "$file" 2>/dev/null) || return
+  if [[ -z "$content" ]]; then return; fi
+  local chunk
+  chunk=$(echo "$content" | python3 -c "
+import sys, json, urllib.request
+text = sys.stdin.read().strip()
+if not text: sys.exit(0)
+payload = json.dumps({'model': 'nomic-embed-text', 'prompt': text[:2048], 'keep_alive': -1}).encode()
+try:
+    req = urllib.request.Request('http://localhost:11434/api/embeddings', data=payload, headers={'Content-Type': 'application/json'})
+    resp = urllib.request.urlopen(req, timeout=10)
+    data = json.loads(resp.read())
+    vec = data.get('embedding', [])
+    if vec:
+        pt = {'id': '$(echo "$file" | md5sum | cut -d' ' -f1)', 'vector': vec, 'payload': {'source': '$source', 'name': '$name', 'file': '$file', 'type': 'file'}}
+        print(json.dumps(pt))
+except Exception:
+    pass
+" 2>/dev/null)
+  if [[ -n "$chunk" ]]; then
+    curl -s -X POST "$QDRANT_URL/collections/apps/points" \
+      -H "Content-Type: application/json" \
+      -d "{\"points\":[$chunk]}" >/dev/null 2>&1 || true
+  fi
+}
+
+ash_context_search() {
+  local query="$1"
+  log "Searching context for: $query"
+  local results
+  results=$(ash context "$query" --limit 5 --no-context 2>/dev/null || echo "[]")
+  echo "$results" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for i, r in enumerate(data[:5], 1):
+        p = r.get('payload', {})
+        print(f'  [{i}] {p.get(\"source\",\"?\")} — {p.get(\"source_name\") or p.get(\"notebook_title\") or p.get(\"url\",\"\")}')
+        print(f'      {p.get(\"text\",\"\")[:120]}')
+except Exception:
+    print('  No results found')
+" 2>/dev/null || log "  No results found"
+}
+
+ash_notebooklm_search() {
+  local query="$1"
+  log "Searching NotebookLM: $query"
+  ash context "$query" --source notebooklm --limit 5 --no-context 2>/dev/null || log "  NotebookLM search unavailable"
+}
+
+ash_web_search() {
+  local query="$1"
+  log "Web research: $query"
+  python3 "$HOME_DIR/ai-services/tools/web-research/src/research.py" research "$query" 2>/dev/null || true
+  ash context "$query" --source web --limit 5 --no-context 2>/dev/null || log "  Web search unavailable"
+}
+
+show_status() {
+  echo "🚀 Ash Vibe Mode Status"
+  echo "======================"
+  echo "Ash dir:       $ASH_DIR"
+  echo "Qdrant:        $(curl -sf http://localhost:6333/healthz 2>/dev/null && echo '✅' || echo '❌')"
+  echo "NotebookLM:    $(curl -sf http://localhost:3000/api/notebooks 2>/dev/null | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('notebooks',[])))" 2>/dev/null || echo 'unknown')"
+  echo "Snapshots:     $(ls $SNAPSHOT_DIR/ 2>/dev/null | wc -l)"
+  echo "Context file:  $CONTEXT_FILE"
+}
+
+show_config() {
+  cat <<CONF
+=== Ash Vibe Mode Configuration ===
+ASH_DIR:       $ASH_DIR
+QDRANT_URL:    $QDRANT_URL
+NOTEBOOKLM_API: $NOTEBOOKLM_API
+SYNC_DIR:      $SYNC_DIR
+SNAPSHOT_DIR:  $SNAPSHOT_DIR
+ASH_MODEL:     ${ASH_MODEL:-nomic-embed-text}
+VIBE_LOG:      $VIBE_LOG
+CONF
+}

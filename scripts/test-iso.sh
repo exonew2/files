@@ -10,6 +10,17 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 pass() { echo -e "${GREEN}✓ PASS${NC}: $1"; }
 fail() { echo -e "${RED}✗ FAIL${NC}: $1"; exit 1; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+log()  { echo -e "${YELLOW}[*]${NC} $1"; }  # fix: was missing, caused set -euo pipefail crash
+
+# ── Load minisign public key (same logic as verify-ash.sh) ──────────────────
+MINISIGN_PUBKEY=""
+if [[ -n "${ASH_MINISIGN_PUBKEY:-}" ]]; then
+    MINISIGN_PUBKEY="$ASH_MINISIGN_PUBKEY"
+elif [[ -f /etc/ash/minisign.pub ]]; then
+    MINISIGN_PUBKEY=$(cat /etc/ash/minisign.pub)
+elif [[ -f "$(dirname "$ISO")/ash.pub" ]]; then
+    MINISIGN_PUBKEY=$(cat "$(dirname "$ISO")/ash.pub")
+fi
 
 echo "═══════════════════════════════════════"
 echo " ash ISO Test Suite"
@@ -28,8 +39,13 @@ sha256sum -c "$SHA256_FILE" >/dev/null 2>&1 && pass "SHA256 matches" || fail "SH
 MINISIG_FILE="${ISO}.minisig"
 [[ -f "$MINISIG_FILE" ]] && pass "minisig file exists" || warn "minisig file missing (optional)"
 if [[ -f "$MINISIG_FILE" ]]; then
-    minisign -Vm "$ISO" -P RWQf6LRCGA9i52mlZT2k5B5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y5Q5Y= -x "$MINISIG_FILE" >/dev/null 2>&1 && \
-        pass "minisign signature valid" || fail "minisign signature invalid"
+    if [[ -z "$MINISIGN_PUBKEY" ]]; then
+        warn "No minisign public key configured — skipping signature check"
+        warn "Set ASH_MINISIGN_PUBKEY or place key in /etc/ash/minisign.pub"
+    else
+        minisign -Vm "$ISO" -P "$MINISIGN_PUBKEY" -x "$MINISIG_FILE" >/dev/null 2>&1 && \
+            pass "minisign signature valid" || fail "minisign signature invalid"
+    fi
 fi
 
 # Test 4: cosign signature

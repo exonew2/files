@@ -1,0 +1,40 @@
+{
+  "ollama_url": "http://127.0.0.1:11434",
+  "listen_host": "127.0.0.1",
+  "listen_port": 11435,
+  "log_decisions": true,
+  "embedding_model": "nomic-embed-text",
+  "embedding_endpoints": ["/api/embeddings", "/api/embed"],
+  "default_model": "qwen2.5-coder:7b",
+  "routes": [
+    {
+      "name": "autocomplete",
+      "match": "prompt_length_lt",
+      "value": 80,
+      "model": "qwen2.5-coder:1.5b"
+    },
+    {
+      "name": "architecture",
+      "match": "prompt_regex",
+      "pattern": "(?i)(architect|design pattern|trade.?off|system design|ADR|RFC|why did|explain|compare|best practice|should I use|pros and cons)",
+      "model": "qwen2.5:14b"
+    },
+    {
+      "name": "security",
+      "match": "prompt_regex",
+      "pattern": "(?i)(vulnerabilit|CVE|exploit|injection|XSS|CSRF|authz|privilege|sandbox|security|attack|zero.?day)",
+      "model": "qwen2.5:14b"
+    },
+    {
+      "name": "code_gen",
+      "match": "prompt_regex",
+      "pattern": "(?i)(write|implement|refactor|function|class|method|generate|create|build|fix|debug|unit test|integration test)",
+      "model": "qwen2.5-coder:7b"
+    },
+    {
+      "name": "explicit",
+      "match": "model_explicitly_set",
+      "model": null
+    }
+  ]
+}

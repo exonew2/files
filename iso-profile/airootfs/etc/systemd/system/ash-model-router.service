@@ -1,0 +1,32 @@
+[Unit]
+Description=Ash Local Model Router (Ollama proxy on :11435)
+Documentation=https://github.com/ash-linux/ash
+After=ollama.service network-online.target
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=aiuser
+Group=aiuser
+ExecStart=/usr/bin/python3 /usr/local/bin/ash-model-router.py \
+    --host 127.0.0.1 \
+    --port 11435 \
+    --config /etc/ash/router.json
+Restart=on-failure
+RestartSec=5
+
+# Route through the agent cgroup slice (Item 7)
+Slice=ash-agents.slice
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ReadWritePaths=/var/log/ash
+
+# Environment
+Environment=ASH_ROUTER_CONFIG=/etc/ash/router.json
+
+[Install]
+WantedBy=multi-user.target

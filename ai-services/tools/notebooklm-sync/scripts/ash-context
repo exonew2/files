@@ -1,0 +1,178 @@
+#!/bin/bash
+# ash context — unified search across all context sources (Qdrant, NotebookLM, web)
+set -euo pipefail
+
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+QDRANT_API_KEY="${QDRANT_API_KEY:-}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/api/embeddings}"
+ASH_MODEL="${ASH_MODEL:-nomic-embed-text}"
+QUERY=""
+LIMIT=5
+SOURCE=""
+NO_CONTEXT=""
+
+usage() {
+    echo "Usage: ash context <query> [options]"
+    echo ""
+    echo "Options:"
+    echo "  --limit N       Number of results (default: 5)"
+    echo "  --source SRC    Filter by source: files, notebooklm, web, all (default: all)"
+    echo "  --no-context    Search only, no AI summary"
+    echo "  --mcp           Start NotebookLM MCP server (stdio transport)"
+    echo "  --help          Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  ash context 'how to deploy'"
+    echo "  ash context 'architecture docs' --source files"
+    echo "  ash context 'Python async' --source notebooklm"
+    echo "  ash context 'release notes' --source web"
+    echo "  ash context --mcp    Start the NotebookLM MCP server"
+    exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --limit) LIMIT="$2"; shift 2 ;;
+        --source) SOURCE="$2"; shift 2 ;;
+        --no-context) NO_CONTEXT="1"; shift ;;
+        --mcp) exec notebooklm-mcp ;;
+        --help|-h) usage ;;
+        *) QUERY="$1"; shift ;;
+    esac
+done
+
+if [[ -z "$QUERY" ]]; then
+    echo "Error: query required" >&2
+    usage 1
+fi
+
+ensure_collection() {
+    local collection="$1"
+    local exists=false
+    if curl -sf "$QDRANT_URL/collections/$collection" -H "api-key: $QDRANT_API_KEY" >/dev/null 2>&1; then
+        exists=true
+    fi
+    if [[ "$exists" == "false" ]]; then
+        curl -s -X PUT "$QDRANT_URL/collections/$collection" \
+            -H "api-key: $QDRANT_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"vectors":{"size":768,"distance":"Cosine"}}' >/dev/null 2>&1 || true
+    fi
+}
+
+embed() {
+    local text="$1"
+    python3 -c "
+import json, urllib.request, urllib.error
+text = '''$(echo "$text" | head -c 2048 | sed "s/'/'\\\\''/g")'''
+payload = json.dumps({'model': '$ASH_MODEL', 'prompt': text, 'keep_alive': -1}).encode()
+req = urllib.request.Request('$OLLAMA_URL', data=payload, headers={'Content-Type': 'application/json'})
+try:
+    resp = urllib.request.urlopen(req, timeout=15)
+    data = json.loads(resp.read())
+    print(json.dumps(data.get('embedding', [])))
+except Exception:
+    print('[]')
+" 2>/dev/null
+}
+
+search_qdrant() {
+    local collection="$1"
+    local query="$2"
+    local limit="$3"
+    local vec
+    vec=$(embed "$query")
+    if [[ "$vec" == "[]" ]]; then
+        return
+    fi
+    curl -s -X POST "$QDRANT_URL/collections/$collection/points/search" \
+        -H "api-key: $QDRANT_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"vector\":$vec,\"limit\":$limit,\"with_payload\":true}" 2>/dev/null | \
+        python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for hit in data.get('result', []):
+        p = hit.get('payload', {})
+        if p.get('type') == '$SOURCE' or '$SOURCE' == 'all':
+            print(json.dumps({'score': hit.get('score', 0), 'payload': p}))
+except Exception:
+    pass
+" 2>/dev/null
+}
+
+echo "🔍 Ash Context Search: \"$QUERY\""
+echo "================================"
+
+ALL_RESULTS="[]"
+
+if [[ -z "$SOURCE" || "$SOURCE" == "all" || "$SOURCE" == "files" ]]; then
+    ensure_collection "apps"
+    FILES_RESULTS=$(search_qdrant "apps" "$QUERY" "$LIMIT" 2>/dev/null || echo "[]")
+    ALL_RESULTS=$(echo "$ALL_RESULTS $FILES_RESULTS" | python3 -c "
+import json, sys
+a = json.loads(sys.argv[1] or '[]')
+b = json.loads(sys.argv[2] or '[]')
+combined = a + b
+combined.sort(key=lambda x: x.get('score', 0), reverse=True)
+print(json.dumps(combined[:int(sys.argv[3])]))
+" -- "$ALL_RESULTS" "$FILES_RESULTS" "$LIMIT" 2>/dev/null || echo "$ALL_RESULTS")
+fi
+
+if [[ -z "$SOURCE" || "$SOURCE" == "all" || "$SOURCE" == "notebooklm" ]]; then
+    ensure_collection "notebooklm_context"
+    NLM_RESULTS=$(search_qdrant "notebooklm_context" "$QUERY" "$LIMIT" 2>/dev/null || echo "[]")
+    ALL_RESULTS=$(echo "$ALL_RESULTS $NLM_RESULTS" | python3 -c "
+import json, sys
+a = json.loads(sys.argv[1] or '[]')
+b = json.loads(sys.argv[2] or '[]')
+combined = a + b
+combined.sort(key=lambda x: x.get('score', 0), reverse=True)
+print(json.dumps(combined[:int(sys.argv[3])]))
+" -- "$ALL_RESULTS" "$NLM_RESULTS" "$LIMIT" 2>/dev/null || echo "$ALL_RESULTS")
+fi
+
+if [[ -z "$SOURCE" || "$SOURCE" == "all" || "$SOURCE" == "web" ]]; then
+    ensure_collection "web_context"
+    WEB_RESULTS=$(search_qdrant "web_context" "$QUERY" "$LIMIT" 2>/dev/null || echo "[]")
+    ALL_RESULTS=$(echo "$ALL_RESULTS $WEB_RESULTS" | python3 -c "
+import json, sys
+a = json.loads(sys.argv[1] or '[]')
+b = json.loads(sys.argv[2] or '[]')
+combined = a + b
+combined.sort(key=lambda x: x.get('score', 0), reverse=True)
+print(json.dumps(combined[:int(sys.argv[3])]))
+" -- "$ALL_RESULTS" "$WEB_RESULTS" "$LIMIT" 2>/dev/null || echo "$ALL_RESULTS")
+fi
+
+RESULT_COUNT=$(echo "$ALL_RESULTS" | python3 -c "import json,sys;print(len(json.loads(sys.stdin.read())))" 2>/dev/null || echo "0")
+
+echo ""
+echo "📄 Results ($RESULT_COUNT):"
+echo "---"
+echo "$ALL_RESULTS" | python3 -c "
+import json, sys
+results = json.loads(sys.stdin.read())
+for i, hit in enumerate(results, 1):
+    p = hit.get('payload', {})
+    score = hit.get('score', 0)
+    src = p.get('source', 'unknown')
+    src_name = p.get('source_name') or p.get('notebook_title') or p.get('url', '')
+    text = p.get('text', '')[:200]
+    print(f'  [{i}] ({src}) {src_name} (score: {score:.3f})')
+    print(f'      {text}')
+    print()
+" 2>/dev/null
+
+if [[ -z "$NO_CONTEXT" && "$RESULT_COUNT" -gt 0 ]]; then
+    echo "🤖 AI Summary:"
+    echo "---"
+    echo "$ALL_RESULTS" | python3 -c "
+import json, sys
+results = json.loads(sys.stdin.read())
+context = '\n'.join([f\"{r.get('payload',{}).get('text','')}\" for r in results[:3]])
+print(f'Context for query \"{QUERY}\":')
+print(context[:1000])
+" 2>/dev/null || true
+fi

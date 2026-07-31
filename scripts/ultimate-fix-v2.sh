@@ -96,17 +96,44 @@ fix_qdrant() {
     local download_url="https://github.com/qdrant/qdrant/releases/download/${latest_tag}/qdrant-x86_64-unknown-linux-musl.tar.gz"
     local tmp_tar="/tmp/qdrant-release.tar.gz"
 
-    log "Downloading Qdrant binary …"
-    if curl -fSL --progress-bar -o "$tmp_tar" "$download_url" 2>&1 | tee -a "$LOGFILE"; then
-        ok "Downloaded ${download_url}"
-    else
-        # Try GNU variant
-        download_url="https://github.com/qdrant/qdrant/releases/download/${latest_tag}/qdrant-x86_64-unknown-linux-gnu.tar.gz"
-        log "Retrying with gnu variant …"
-        if curl -fSL --progress-bar -o "$tmp_tar" "$download_url" 2>&1 | tee -a "$LOGFILE"; then
-            ok "Downloaded (gnu variant)"
+    # SHA256 helper: download and verify checksum for a tarball
+    verify_qdrant_checksum() {
+        local file="$1" sha_url="$2" label="$3"
+        local sha_file="${file}.sha256"
+        if curl -sfL -o "$sha_file" "${sha_url}" 2>/dev/null; then
+            local expected actual
+            expected=$(cut -d' ' -f1 < "$sha_file")
+            actual=$(sha256sum "$file" | cut -d' ' -f1)
+            rm -f "$sha_file"
+            if [[ "$expected" != "$actual" ]]; then
+                fail "SHA256 MISMATCH for ${label} — expected ${expected}, got ${actual}"
+                fail "Refusing to install unverified binary"
+                rm -f "$file"
+                return 1
+            fi
+            ok "SHA256 verified: ${label}"
         else
-            fail "Could not download Qdrant binary"
+            warn "No .sha256 available for ${label} — proceeding without checksum (not recommended)"
+        fi
+        return 0
+    }
+
+    log "Downloading Qdrant binary ..."
+    if curl -fSL --progress-bar -o "$tmp_tar" "$download_url" 2>&1 | tee -a "$LOGFILE"; then
+        verify_qdrant_checksum "$tmp_tar" "${download_url}.sha256" "qdrant-musl" || qdrant_ok=false
+        [[ "$qdrant_ok" == true ]] && ok "Downloaded and verified: ${download_url}"
+    else
+        # Try GNU variant — same checksum requirement, no free passes
+        download_url="https://github.com/qdrant/qdrant/releases/download/${latest_tag}/qdrant-x86_64-unknown-linux-gnu.tar.gz"
+        log "Retrying with gnu variant ..."
+        if curl -fSL --progress-bar -o "$tmp_tar" "$download_url" 2>&1 | tee -a "$LOGFILE"; then
+            verify_qdrant_checksum "$tmp_tar" "${download_url}.sha256" "qdrant-gnu" || {
+                fail "GNU variant also failed checksum verification — aborting for security"
+                qdrant_ok=false
+            }
+            [[ "$qdrant_ok" == true ]] && ok "Downloaded and verified: gnu variant"
+        else
+            fail "Could not download Qdrant binary (both musl and gnu variants failed)"
             qdrant_ok=false
         fi
     fi
